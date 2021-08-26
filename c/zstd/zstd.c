@@ -34,7 +34,7 @@ int main(int argc, char **argv) {
           flag = ZSTD_e_end;
       }
       in.size = nin;
-      int ret = ZSTD_compressStream2(ctx, &out, &in, nin ? ZSTD_e_continue : ZSTD_e_end);
+      int ret = ZSTD_compressStream2(ctx, &out, &in, flag);
       if (ZSTD_isError(ret)){
           printf("ZSTD error: %d",ret);
           _exit(1);
