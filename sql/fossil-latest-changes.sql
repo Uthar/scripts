@@ -23,10 +23,11 @@ order by d desc
 limit 1
 
 -- all files
+
 select f.name as name, e.comment, datetime(e.mtime) as d
 from filename f, event e, mlink m
 where f.fnid=m.fnid
 and e.objid=m.mid
 and e.type='ci'
-group by name
+group by name,d
 order by d desc
