@@ -59,7 +59,7 @@ if {[info exists tkt_datetime]} {
   if {[string length $private_contact]>0} {
     html "<tr>"
     html "<td class='tktDspLabel'>Contact:</td><td class='tktDspValue'>"
-    $private_contact
+    html $private_contact
     html "</td>"
     html "</tr>"
   }
@@ -68,7 +68,7 @@ if {[info exists tkt_datetime]} {
 
 <tr>
 <td class="tktDspLabel">Version&nbsp;Found&nbsp;In:</td>
-<td colspan="3" valign="top" class="tktDspValue"><a href="/info/$<foundin>">$<foundin></a></td>
+<td colspan="3" valign="top" class="tktDspValue"><a href="$<home>/info/$<foundin>">$<foundin></a></td>
 </tr>
 
 <th1>
