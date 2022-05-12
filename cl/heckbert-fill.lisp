@@ -10,13 +10,17 @@ Reference: see Paul Heckbert's stack-based seed fill algorithm in
 'Graphic Gems', ed. Andrew Glassner, Academic Press, 1990.
 The algorithm description is given on pp. 275-277; working C code is
 on pp. 721-722."
-  (let ((l nil)
-        (y-max (array-dimension buf 0))
-        (x-max (array-dimension buf 1))
-        (stack (list
-                (list (1+ y) x x -1)
-                (list y x x 1)))
-        (ov (aref buf y x)))
+  (let* ((l nil)
+         (y-max (array-dimension buf 0))
+         (x-max (array-dimension buf 1))
+         (stack (list
+                 (list (1+ y) x x -1)
+                 (list y x x 1)))
+         (ov (aref buf y x))
+         (push-segment (lambda (y xl xr dy)
+                         (unless (or (minusp (+ y dy))
+                                     (>= (+ y dy) y-max))
+                           (push (list y xl xr dy) stack)))))
     (when (eql ov nv)
       (return-from heckbert-fill))
     (do () ((null (first stack)))
@@ -30,18 +34,15 @@ on pp. 721-722."
              (go :skip))
            (setf l (1+ x))
            (when (< l x1)
-             (unless (or (minusp (- y dy)) (>= (- y dy) y-max))
-               (push (list y l (1- x1) (- dy)) stack)))
+             (funcall push-segment y l (1- x1) (- dy)))
            (setf x (1+ x1))
          :loop
            (do ((_ nil (incf x)))
                ((or (>= x x-max) (not (eql (aref buf y x) ov))))
              (setf (aref buf y x) nv))
-           (unless (or (minusp (+ y dy)) (>= (+ y dy) y-max))
-             (push (list y l (1- x) dy) stack))
+           (funcall push-segment y l (1- x) dy)
            (when (> x (1+ x2))
-             (unless (or (minusp (- y dy)) (>= (- y dy) y-max))
-               (push (list y (1+ x2) (1- x) (- dy)) stack)))
+             (funcall push-segment y (1+ x2) (1- x) (- dy)))
          :skip
            (do ((_ (incf x) (incf x)))
                ((or (> x x2) (>= x x-max) (eql (aref buf y x) ov))))
@@ -70,6 +71,6 @@ on pp. 721-722."
 
   (heckbert-fill screen 5 2 11)
   (heckbert-fill screen 3 2 12)
-  (heckbert-fill screen 3 0 90)
+  (heckbert-fill screen 3 0 91)
 
   screen)
