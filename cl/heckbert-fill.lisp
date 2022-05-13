@@ -8,8 +8,8 @@ The algorithm description is given on pp. 275-277; working C code is
 on pp. 721-722."
   (let* ((l nil)
          (stack (list
-                 (list (1+ y) x x -1)
-                 (list y x x 1))))
+                 (list y x x -1)
+                 (list (1+ y) x x 1))))
     (do () ((null (first stack)))
       (destructuring-bind (y x1 x2 dy) (pop stack)
         (do ((_ (setf x x1) (decf x)))
