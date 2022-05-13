@@ -61,8 +61,36 @@ on pp. 721-722."
 #+(or)
 (progn
 
+  (defparameter image
+    (let ((image (make-array '(600 1000))))
+      (with-open-file (f "~/Documents/Untitled.data"
+                         :element-type '(unsigned-byte 8))
+        (dotimes (y 600)
+          (dotimes (x 1000)
+            (setf (aref image y x) (* 100 (read-byte f))))))
+      image))
+
+  (funcall (seed-fill-for image) 1 1 100)
+  (funcall (seed-fill-for image) 40 200 100)
+  (funcall (seed-fill-for image) 220 175 100)
+  (funcall (seed-fill-for image) 550 110 100)
+  (funcall (seed-fill-for image) 200 100 100)
+
+  (with-open-file (f "~/out.data"
+                     :element-type '(unsigned-byte 8)
+                     :direction :output
+                     :if-exists :supersede)
+    (let ((seq (make-array (* 1000 600) :displaced-to image)))
+      (write-sequence seq f))
+    nil)
+
+  )
+  
+#+(or)
+(progn
+
   (defparameter screen
-    (make-array '(10 10)))
+    (make-array '(1000 1000)))
 
   (progn
     (setf (aref screen 3 3) 13)
@@ -77,13 +105,16 @@ on pp. 721-722."
     (setf (aref screen 1 6) 13)
     )
 
+  (time 
   (let ((fill (seed-fill-for screen)))
-    (time (funcall fill 5 2 10))
-    (time (funcall fill 3 2 77))
-    (time (funcall fill 3 0 33))
-    (time (funcall fill 5 2 11))
-    (time (funcall fill 3 2 78))
-    (time (funcall fill 3 0 34))
-    )
+    (funcall fill 5 2 10)
+    (funcall fill 3 2 77)
+    (funcall fill 3 0 33)
+    (funcall fill 5 2 11)
+    (funcall fill 3 2 78)
+    (funcall fill 3 0 34)
+    ))
 
-  screen)
+  screen
+
+  nil)
