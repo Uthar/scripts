@@ -2,11 +2,7 @@
 ;; (declaim (optimize debug))
 
 (defun heckbert-fill (x y inside write)
-  "Set the pixel at (x,y) and all of its 4-connected neighbors
-with the same pixel value to the new pixel value nv.
-A 4-connected neighbor is a pixel above, below, left, or right of a pixel.
-
-Reference: see Paul Heckbert's stack-based seed fill algorithm in
+  "Reference: see Paul Heckbert's stack-based seed fill algorithm in
 'Graphic Gems', ed. Andrew Glassner, Academic Press, 1990.
 The algorithm description is given on pp. 275-277; working C code is
 on pp. 721-722."
