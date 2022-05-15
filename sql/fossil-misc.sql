@@ -13,3 +13,11 @@
   where b.rid = fp.child
   and e.objid = b.rid
   order by e.mtime desc
+
+
+ -- Find all the non-merge check-ins.
+select distinct b.uuid, comment
+from blob b, event e, plink p
+where e.objid = b.rid
+and (select count(pid) from plink where cid = b.rid) = 1
+order by e.mtime desc
