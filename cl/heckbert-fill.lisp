@@ -1,20 +1,57 @@
 
-;; (declaim (optimize debug))
+(declaim (optimize speed))
 
-(defun seed-fill (x y inside write)
+
+(declaim (inline pixel-read))
+(declaim (ftype (function ((vector (unsigned-byte 8))
+                           (signed-byte 16)
+                           (signed-byte 16)
+                           (signed-byte 16)
+                           (signed-byte 16))
+                          (unsigned-byte 8))
+                pixel-read))
+
+(defun pixel-read (a w h x y)
+  (if (and (< -1 x w)
+           (< -1 y h))
+      (aref a (+ (* y w) x))
+      0))
+
+(declaim (inline pixel-write))
+(declaim (ftype (function ((vector (unsigned-byte 8))
+                           (signed-byte 16)
+                           (signed-byte 16)
+                           (signed-byte 16)
+                           (signed-byte 16)
+                           (unsigned-byte 8))
+                          (unsigned-byte 8))
+                pixel-write))
+
+(defun pixel-write (a w h x y nv)
+  (when (and (< -1 x w)
+             (< -1 y h))
+    (setf (aref a (+ (* y w) x)) nv)))
+
+(defun seed-fill (a w h x y nv)
   "Reference: see Paul Heckbert's stack-based seed fill algorithm in
 'Graphic Gems', ed. Andrew Glassner, Academic Press, 1990.
 The algorithm description is given on pp. 275-277; working C code is
 on pp. 721-722."
+  (declare (type fixnum x y))
   (let* ((l nil)
          (stack (list
                  (list y x x -1)
-                 (list (1+ y) x x 1))))
+                 (list (1+ y) x x 1)))
+         (ov (pixel-read a w h x y)))
+    (when (= ov nv)
+      (return-from seed-fill))
     (do () ((null (first stack)))
       (destructuring-bind (y x1 x2 dy) (pop stack)
+        (declare (type fixnum y x1 x2)
+                 (type (integer -1 1) dy))
         (do ((_ (setf x x1) (decf x)))
-            ((not (funcall inside x y)))
-          (funcall write x y))
+            ((not (= (pixel-read a w h x y) ov)))
+          (pixel-write a w h x y nv))
         (tagbody
            (when (>= x x1)
              (go :skip))
@@ -24,40 +61,18 @@ on pp. 721-722."
            (setf x (1+ x1))
          :loop
            (do ((_ nil (incf x)))
-               ((not (funcall inside x y)))
-             (funcall write x y))
+               ((not (= (pixel-read a w h x y) ov)))
+             (pixel-write a w h x y nv))
            (push (list (+ y dy) l (1- x) dy) stack)
            (when (> x (1+ x2))
              (push (list (- y dy) (1+ x2) (1- x) (- dy)) stack))
          :skip
            (do ((_ (incf x) (incf x)))
-               ((or (> x x2) (funcall inside x y))))
+               ((or (> x x2) (= (pixel-read a w h x y) ov))))
            (setf l x)
            (when (<= x x2)
              (go :loop)))))))
 
-(defun make-inside-function (screen x y &key (test #'eql))
-  (let ((ov (aref screen y x)))
-    (lambda (x y)
-      (funcall test (ignore-errors (aref screen y x)) ov))))
-
-(defun make-write-function (screen nv)
-  (lambda (x y)
-    (setf (aref screen y x) nv)))
-
-(defun seed-fill-for (array2 &key (test #'eql))
-  (check-type array2 (array * (* *)))
-  (let ((x-max (1- (array-dimension array2 1)))
-        (y-max (1- (array-dimension array2 0))))
-    (lambda (x y nv)
-      (assert (<= 0 x x-max) (x))
-      (assert (<= 0 y y-max) (y))
-      (unless (funcall test (aref array2 y x) nv)
-        (let ((inside (make-inside-function array2 x y :test test))
-              (write (make-write-function array2 nv)))
-          (seed-fill x y inside write))))))
-               
-    
 #+(or)
 (progn
 
@@ -87,10 +102,19 @@ on pp. 721-722."
   )
   
 #+(or)
+(time 
 (progn
 
   (defparameter screen
-    (make-array '(1000 1000)))
+    (make-array (* 4000 4000)
+                :element-type '(unsigned-byte 8)
+                :initial-element 255))
+
+  (time (seed-fill screen 4000 4000 30 30 125))
+
+  (dotimes (i 16000)
+    (dotimes (j 16000)
+      (setf (aref screen (+ (* 16000 i) j)) (random 255))))
 
   (progn
     (setf (aref screen 3 3) 13)
@@ -105,16 +129,15 @@ on pp. 721-722."
     (setf (aref screen 1 6) 13)
     )
 
-  (time 
   (let ((fill (seed-fill-for screen)))
-    (funcall fill 5 2 10)
+    (time (funcall fill 5 2 77)))
     (funcall fill 3 2 77)
     (funcall fill 3 0 33)
     (funcall fill 5 2 11)
     (funcall fill 3 2 78)
-    (funcall fill 3 0 34)
-    ))
+    (funcall fill 3 0 34))
+    )
 
   screen
 
-  nil)
+  nil))
