@@ -1,7 +1,6 @@
 
 (declaim (optimize speed))
 
-
 (declaim (inline pixel-read))
 (declaim (ftype (function ((vector (unsigned-byte 8))
                            (signed-byte 16)
@@ -40,8 +39,8 @@ on pp. 721-722."
   (declare (type fixnum x y))
   (let* ((l nil)
          (stack (list
-                 (list y x x -1)
-                 (list (1+ y) x x 1)))
+                 (list y x x 1)
+                 (list (1+ y) x x -1)))
          (ov (pixel-read a w h x y)))
     (when (= ov nv)
       (return-from seed-fill))
@@ -106,11 +105,11 @@ on pp. 721-722."
 (progn
 
   (defparameter screen
-    (make-array (* 4000 4000)
+    (make-array (* 8000 8000)
                 :element-type '(unsigned-byte 8)
                 :initial-element 255))
 
-  (time (seed-fill screen 4000 4000 30 30 125))
+  (time (seed-fill screen 8000 8000 30 30 127))
 
   (dotimes (i 16000)
     (dotimes (j 16000)
