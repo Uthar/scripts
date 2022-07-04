@@ -4,10 +4,10 @@ def make_filename(filename):
     return filename.replace('/','-') + ".pdf"
 
 def extract_filename(page):
-        text = page.extractText()
-        lines = text.split()
-        filename = next(filter(lambda line: line.startswith("BL-"), lines))
-        return make_filename(filename)
+    text = page.extractText()
+    lines = text.split()
+    filename = next(filter(lambda line: line.startswith("BL-"), lines))
+    return make_filename(filename)
 
 def split(filename):
     reader = PdfReader(filename)
