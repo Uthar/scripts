@@ -59,14 +59,14 @@
     (error "Pool has shut down."))
   (let ((promise (make-instance 'promise))
         (job2 (lambda ()
-                (resolve promise (funcall job)))))
+                (resolve promise (funcall job2)))))
     (sb-concurrency:send-message (slot-value pool 'queue) job2)
     promise))
 
-(defparameter pool (make-instance 'thread-pool :size 5))
+;; (defparameter pool (make-instance 'thread-pool :size 5))
 
-(defparameter promise (submit pool (lambda () (sleep 5) (random 100))))
+;; (defparameter promise (submit pool (lambda () (sleep 5) (random 100))))
 
-(deref promise)
+;; (deref promise)
 
-(shutdown pool)
+;; (shutdown pool)
