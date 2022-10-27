@@ -59,7 +59,7 @@
     (error "Pool has shut down."))
   (let* ((promise (make-instance 'promise))
          (job2 (lambda ()
-                 (resolve promise (funcall job2)))))
+                 (resolve promise (funcall job)))))
     (sb-concurrency:send-message (slot-value pool 'queue) job2)
     promise))
 
