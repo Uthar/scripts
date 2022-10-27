@@ -57,9 +57,9 @@
 (defmethod submit ((pool thread-pool) (job function))
   (when (slot-value pool 'shutdownp)
     (error "Pool has shut down."))
-  (let ((promise (make-instance 'promise))
-        (job2 (lambda ()
-                (resolve promise (funcall job2)))))
+  (let* ((promise (make-instance 'promise))
+         (job2 (lambda ()
+                 (resolve promise (funcall job2)))))
     (sb-concurrency:send-message (slot-value pool 'queue) job2)
     promise))
 
