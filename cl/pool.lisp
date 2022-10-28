@@ -63,6 +63,16 @@
     (sb-concurrency:send-message (slot-value pool 'queue) job2)
     promise))
 
+(defun functionsp (sequence)
+  (every #'functionp sequence))
+
+(deftype functions ()
+  '(and sequence (satisfies functionsp)))
+
+(defmethod invoke-all ((pool thread-pool) (jobs sequence))
+  (check-type jobs functions)
+  (map 'list (lambda (x) (submit pool x)) jobs))
+
 ;; (defparameter pool (make-instance 'thread-pool :size 5))
 
 ;; (defparameter promise (submit pool (lambda () (sleep 5) (random 100))))
