@@ -74,9 +74,26 @@
   (with-slots (%stream) stream
     #+abcl (java:jcall "read" %stream)))
 
-(defmethod gray:stream-write-byte ((stream socket-output-stream) byte)
+(defmethod gray:stream-read-sequence ((stream socket-input-stream)
+                                      sequence start end &key)
   (with-slots (%stream) stream
-    #+abcl (java:jcall "write" %stream byte)))
+    #+abcl
+    (let* ((buf (java:jnew-array "byte" (length sequence)))
+           (read (java:jcall "read" %stream buf start (or
+                                                       end
+                                                       (length sequence)))))
+      (loop for index below read
+            do (setf (elt sequence (+ start index))
+                     (java:jarray-ref buf (+ start index))))
+      read)))
+
+
+(defmethod gray:stream-write-sequence ((stream socket-output-stream)
+                                       sequence start end &key)
+  (with-slots (%stream) stream
+    #+abcl
+    (let ((jarray (java:jnew-array-from-list "byte" (coerce sequence 'list))))
+      (java:jcall "write" %stream jarray start (or end (length sequence))))))
 
 (defmethod accept ((server server-socket))
   (make-instance
