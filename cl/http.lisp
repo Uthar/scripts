@@ -142,7 +142,8 @@
     (assoc* 'method params) +space+
     (assoc* 'path params) +space+
     +http/1.1+ +crlf+
-    (headers->string (assoc* 'headers params)) +crlf+
+    (headers->string (assoc* 'headers params))
+    +crlf+
     (assoc* 'body params)))
 
 ;; A user agent MUST generate a Host header field in a request
