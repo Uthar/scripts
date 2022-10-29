@@ -93,7 +93,8 @@
   (with-slots (%stream) stream
     #+abcl
     (let ((jarray (java:jnew-array-from-list "byte" (coerce sequence 'list))))
-      (java:jcall "write" %stream jarray start (or end (length sequence))))))
+      (java:jcall "write" %stream jarray start (or end (length sequence)))
+      sequence)))
 
 (defmethod accept ((server server-socket))
   (make-instance
