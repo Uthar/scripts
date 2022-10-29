@@ -2,7 +2,7 @@
 
 (defpackage dev.cadm.http
   (:documentation "RFC9110 client implementation")
-  (:use :cl :alexandria :alexandria-2 :java)
+  (:use :cl :alexandria)
   (:export :request))
 
 ;; Authorization schemes:
@@ -131,7 +131,7 @@
   (loop
     for (name . value) in headers
     collect (list name ": " value +crlf+) into strings
-    finally (return (apply #'concatenate 'string (alexandria:flatten strings)))))
+    finally (return (apply #'concatenate 'string (flatten strings)))))
 
 (defun assoc* (&rest args)
   (cdr (apply #'assoc args)))
@@ -139,11 +139,11 @@
 (defun params->payload (params)
   "RFC1945, Section 4."
   (concatenate 'string
-               (assoc* 'method params) +space+
-               (assoc* 'path params) +space+
-               +http/1.1+ +crlf+
-               (headers->string (assoc* 'headers params)) +crlf+
-               (assoc* 'body params)))
+    (assoc* 'method params) +space+
+    (assoc* 'path params) +space+
+    +http/1.1+ +crlf+
+    (headers->string (assoc* 'headers params)) +crlf+
+    (assoc* 'body params)))
 
 ;; A user agent MUST generate a Host header field in a request
 ;; unless it sends that information as an ":authority" pseudo-header
