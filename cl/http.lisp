@@ -3,6 +3,8 @@
 (defpackage dev.cadm.http
   (:documentation "RFC9110 client implementation")
   (:use :cl :alexandria)
+  (:local-nicknames
+   (:sock :dev.cadm.socket))
   (:export :request))
 
 ;; Authorization schemes:
@@ -44,23 +46,22 @@
 (defun request (params)
   (let* ((host (assoc* 'host params))
          (port (assoc* 'port params))
-         (address (java:jstatic "getByName" "java.net.InetAddress" host))
-         (socket (java:jnew "java.net.Socket" address port))
-         (out (java:jcall "getOutputStream" socket))
-         (in (java:jcall "getInputStream" socket))
+         (socket (sock:make-socket host port))
+         (out (sock::make-socket-output-stream socket))
+         (in (sock::make-socket-input-stream socket))
          (payload (params->payload params)))
-    (java:jcall "write" out (string->jarray payload))
-    (java:jcall "flush" out)
+    (write-sequence (babel:string-to-octets payload) out)
     (read-http-response in)))
 
 (defun is-read-line (is)
   (loop
-    for byte = (java:jcall "read" is)
+    for byte = (read-byte is)
     while (not (or (char= (code-char byte) #\Return)
                    (char= (code-char byte) #\Newline)))
-    collect byte into bytes
-    finally (return (prog1 (bytes->string bytes)
-                      (java:jcall "skip" is 1)))))
+    collect byte into bytes 
+    finally (return (prog1 (babel:octets-to-string
+                            (coerce bytes '(vector (unsigned-byte 8))))
+                      (read-byte is)))))
 
 (defun read-headers (is)
   (loop
@@ -69,7 +70,9 @@
     for (name value) = (uiop:split-string line :separator ":")
     collect (cons name (string-trim " " value))))
 
-;; FIXME not java specific
+(defun make-byte-array (&rest args)
+  (apply #'make-array `(,@args :element-type (unsigned-byte 8))))
+
 (defun read-http-response (is)
   (let* ((control-data (is-read-line is))
          (headers (read-headers is))
@@ -79,22 +82,11 @@
                                  :test #'string=)
                           :junk-allowed t)))
     (if content-length
-        (let ((response (java:jnew-array "byte" content-length)))
-          (java:jcall "read" is response)
-          (prog1 (jarray->string response)
-            (java:jcall "close" is)))
+        (let ((response (make-byte-array content-length)))
+          (read-sequence response is)
+          (babel:octets-to-string response))
         (error "not implemented: HTTP requests with no content-length"))))
                                           
-(defun |InputStream->string| (is)
-  (loop
-    with out = (java:jnew "java.io.ByteArrayOutputStream")
-    with buffer = (java:jnew-array "byte" 4096)
-    for read = (java:jcall "read" is buffer)
-    when (plusp read)
-      do (java:jcall "write" out buffer 0 read)
-    when (not (plusp read))
-      do (return (java:jcall "toString" out "UTF-8"))))
-
 (defun string->bytes (string)
   (make-array (length string)
               :element-type '(unsigned-byte 8)
@@ -104,18 +96,6 @@
   (make-array (length bytes)
               :element-type 'character
               :initial-contents (map 'vector #'code-char bytes)))
-
-;; TODO babel
-(defun string->jarray (string)
-  (java:jnew-array-from-array "byte" (string->bytes string)))
-
-(defun jarray->string (jarray)
-  (loop for i from 0 below (java:jarray-length jarray)
-        collecting (java:jarray-ref jarray i) into list
-        finally (return (make-array (length list)
-                                    :element-type 'character
-                                    :initial-contents
-                                    (map 'vector #'code-char list)))))
 
 (defparameter +http/1.1+
   "HTTP/1.1")
