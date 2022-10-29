@@ -1,8 +1,8 @@
 
-
 (defpackage dev.cadm.http
   (:documentation "RFC9110 client implementation")
   (:use :cl :alexandria)
+  (:import-from :split-sequence :split-sequence)
   (:local-nicknames
    (:sock :dev.cadm.socket))
   (:export :request))
@@ -12,8 +12,6 @@
 
 
 (in-package dev.cadm.http)
-
-;; TODO gray streams
 
 ;; HTTP/1.1 messages contain a potentially unbounded stream of content (body)
 
@@ -51,7 +49,8 @@
          (in (sock::make-socket-input-stream socket))
          (payload (params->payload params)))
     (write-sequence (babel:string-to-octets payload) out)
-    (read-http-response in)))
+    (multiple-value-prog1
+        (read-http-response in))))
 
 (defun is-read-line (is)
   (loop
@@ -78,14 +77,18 @@
          (headers (read-headers is))
          (content-length (parse-integer
                           (assoc* "content-length" headers
-                                 :key #'string-downcase
-                                 :test #'string=)
+                                  :key #'string-downcase
+                                  :test #'string=)
                           :junk-allowed t)))
     (if content-length
         (let ((response (make-byte-array content-length)))
           (read-sequence response is)
-          (babel:octets-to-string response))
+          (destructuring-bind (version code reason)
+              (split-sequence #\Space control-data)
+            (declare (ignorable version))
+            (values (babel:octets-to-string response) code reason)))
         (error "not implemented: HTTP requests with no content-length"))))
+
                                           
 (defun string->bytes (string)
   (make-array (length string)
@@ -147,5 +150,3 @@
     response))
 
 ;; (defparameter response (test-request))
-
-
