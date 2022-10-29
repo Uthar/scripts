@@ -80,9 +80,9 @@
                           :junk-allowed t)))
     (if content-length
         (let ((response (java:jnew-array "byte" content-length)))
-          (jcall "read" is response)
+          (java:jcall "read" is response)
           (prog1 (jarray->string response)
-            (jcall "close" is)))
+            (java:jcall "close" is)))
         (error "not implemented: HTTP requests with no content-length"))))
                                           
 (defun |InputStream->string| (is)
