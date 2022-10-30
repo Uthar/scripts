@@ -55,6 +55,7 @@
 
 (defun request* (params)
   ;; TODO(kasper): should handle Content-Length
+  ;; TODO(kasper): should handle Content-Encoding
   (babel:octets-to-string
    (read-stream-content-into-byte-vector (request params))))
 
