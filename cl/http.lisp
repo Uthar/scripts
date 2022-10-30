@@ -54,6 +54,7 @@
     (read-http-response in)))
 
 (defun request* (params)
+  ;; TODO(kasper): should handle Content-Length
   (babel:octets-to-string
    (read-stream-content-into-byte-vector (request params))))
 
