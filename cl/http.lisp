@@ -1,10 +1,8 @@
 
-(defpackage dev.cadm.http
+(defpackage http
   (:documentation "RFC9110 client implementation")
   (:use :cl :alexandria)
   (:import-from :split-sequence :split-sequence)
-  (:local-nicknames
-   (:sock :dev.cadm.socket))
   (:export
    :request
    :request*))
@@ -13,7 +11,7 @@
 ;; https://www.iana.org/assignments/http-authschemes/http-authschemes.xhtml
 
 
-(in-package dev.cadm.http)
+(in-package http)
 
 ;; HTTP/1.1 messages contain a potentially unbounded stream of content (body)
 
@@ -46,17 +44,21 @@
 (defun request (params)
   (let* ((host (assoc* 'host params))
          (port (assoc* 'port params))
-         (socket (sock:make-socket host port))
-         (out (sock::make-socket-output-stream socket))
-         (in (sock::make-socket-input-stream socket))
+         (proto (assoc* 'proto params))
+         (socket (case proto
+                   (http (socket:make-socket host port))
+                   (https (socket:make-tls-socket host port))
+                   (otherwise (socket:make-socket host port))))
+         (out (socket:make-socket-output-stream socket))
+         (in (socket:make-socket-input-stream socket))
          (payload (params->payload params)))
-    (write-sequence (babel:string-to-octets payload) out)
+    (write-sequence (encode:string->octets payload) out)
     (read-http-response in)))
 
 (defun request* (params)
   ;; TODO(kasper): should handle Content-Length
   ;; TODO(kasper): should handle Content-Encoding
-  (babel:octets-to-string
+  (encode:octets->string
    (read-stream-content-into-byte-vector (request params))))
 
 (defun is-read-line (is)
@@ -64,8 +66,8 @@
     for byte = (read-byte is)
     while (not (or (char= (code-char byte) #\Return)
                    (char= (code-char byte) #\Newline)))
-    collect byte into bytes 
-    finally (return (prog1 (babel:octets-to-string
+    collect byte into bytes
+    finally (return (prog1 (encode:octets->string
                             (coerce bytes '(vector (unsigned-byte 8))))
                       (read-byte is)))))
 
@@ -85,13 +87,22 @@
          (splits (split-sequence #\Space control-data))
          (version (first splits))
          (code (second splits))
-         (reason (third splits)))
+         (reason (nthcdr 2 splits)))
       (values is
               (parse-integer code)
-              reason
+              (apply #'concatenate 'string (interpose 'list " " reason))
               version)))
 
-                                          
+(defun interpose (result-type separator sequence)
+  (coerce
+   (reduce (lambda (sequence item)
+             (if (null sequence)
+                 (list* item sequence)
+                 (list* item separator sequence)))
+           (reverse sequence)
+           :initial-value nil)
+   result-type))
+
 (defun string->bytes (string)
   (make-array (length string)
               :element-type '(unsigned-byte 8)

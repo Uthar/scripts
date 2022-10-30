@@ -1,5 +1,8 @@
 (defpackage encode
-  (:use :common-lisp))
+  (:use :common-lisp)
+  (:export
+   :octets->string
+   :string->octets))
 
 (in-package encode)
 

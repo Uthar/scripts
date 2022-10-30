@@ -1,6 +1,6 @@
 
 
-(defpackage dev.cadm.socket
+(defpackage socket
   (:use :cl)
   (:shadow :close)
   (:local-nicknames (:gray :trivial-gray-streams)
@@ -10,8 +10,11 @@
    :socket
    :socket-stream
    :make-socket
+   :make-tls-socket
    :socket-input-stream
    :socket-output-stream
+   :make-socket-input-stream
+   :make-socket-output-stream
    :close
    :bind
    :connect
@@ -19,7 +22,7 @@
    :connected-p
    :bound-p))
 
-(in-package dev.cadm.socket)
+(in-package socket)
 
 (defclass socket ()
   ((%socket :initform nil :initarg :socket)))
@@ -103,7 +106,7 @@
    (java:jcall "getOutputStream" (slot-value socket '%socket))))
 
 (defclass socket-stream (gray:fundamental-binary-stream)
-  ((socket :initarg :socket :zinitform (error "socket required"))
+  ((socket :initarg :socket :initform (error "socket required"))
    (%stream :initarg :stream :initform (error "stream required"))))
 
 (defclass socket-input-stream (socket-stream
