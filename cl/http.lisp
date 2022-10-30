@@ -58,6 +58,7 @@
 (defun request* (params)
   ;; TODO(kasper): should handle Content-Length
   ;; TODO(kasper): should handle Content-Encoding
+  ;; TODO(kasper): streaming encode
   (encode:octets->string
    (read-stream-content-into-byte-vector (request params))))
 
