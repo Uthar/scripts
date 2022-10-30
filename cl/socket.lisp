@@ -93,6 +93,7 @@
       (format t "read: ~A~%" (+ start read))
       (if (= read -1)
           (progn
+            ;; TODO(kasper)L should close stream here?
             (format t "EOF~%")
             0)
           (loop for index below read
