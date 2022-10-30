@@ -5,7 +5,6 @@
   (:shadow :close)
   (:local-nicknames (:gray :trivial-gray-streams)
                     (:a :alexandria-2)
-                    (:b :babel)
                     #+abcl (:j :java))
   (:export
    :socket
@@ -28,6 +27,9 @@
 (defclass server-socket (socket)
   ())
 
+(defclass tls-socket (socket)
+  ())
+
 (defun make-socket (host port)
   (make-instance 'socket
     :socket
@@ -41,6 +43,20 @@
     :socket
     #+abcl
     (java:jnew "java.net.ServerSocket" port)))
+
+(defparameter +tls1.3+ "TLSv1.3")
+
+;; TODO handle protocols
+;; TODO disable cert verify for development
+(defun make-tls-socket (host port &optional (proto +tls1.3+))
+  (make-instance 'tls-socket
+    :socket
+    #+abcl
+    (let* ((address (java:jstatic "getByName" "java.net.InetAddress" host))
+           (context (java:jstatic "getDefault" "javax.net.ssl.SSLContext"))
+           (factory (java:jcall "getSocketFactory" context))
+           (socket (java:jcall "createSocket" factory address port)))
+      socket)))
 
 (defun make-socket-input-stream (socket)
   (make-instance
@@ -59,7 +75,7 @@
    (java:jcall "getOutputStream" (slot-value socket '%socket))))
 
 (defclass socket-stream (gray:fundamental-binary-stream)
-  ((socket :initarg :socket :initform (error "socket required"))
+  ((socket :initarg :socket :zinitform (error "socket required"))
    (%stream :initarg :stream :initform (error "stream required"))))
 
 (defclass socket-input-stream (socket-stream
