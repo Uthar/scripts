@@ -5,7 +5,9 @@
   (:import-from :split-sequence :split-sequence)
   (:local-nicknames
    (:sock :dev.cadm.socket))
-  (:export :request))
+  (:export
+   :request
+   :request*))
 
 ;; Authorization schemes:
 ;; https://www.iana.org/assignments/http-authschemes/http-authschemes.xhtml
@@ -50,6 +52,10 @@
          (payload (params->payload params)))
     (write-sequence (babel:string-to-octets payload) out)
     (read-http-response in)))
+
+(defun request* (params)
+  (babel:octets-to-string
+   (read-stream-content-into-byte-vector (request params))))
 
 (defun is-read-line (is)
   (loop
