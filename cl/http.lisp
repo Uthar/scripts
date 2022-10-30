@@ -89,10 +89,12 @@
          (version (first splits))
          (code (second splits))
          (reason (nthcdr 2 splits)))
-      (values is
-              (parse-integer code)
-              (apply #'concatenate 'string (interpose 'list " " reason))
-              version)))
+    ;; TODO(kasper): handle chunked encoding
+    (values is
+            (parse-integer code)
+            (apply #'concatenate 'string (interpose 'list " " reason))
+            headers
+            version)))
 
 (defun interpose (result-type separator sequence)
   (coerce
