@@ -46,17 +46,45 @@
 
 (defparameter +tls1.3+ "TLSv1.3")
 
-;; TODO handle protocols
-;; TODO disable cert verify for development
-(defun make-tls-socket (host port &optional (proto +tls1.3+))
+(defun make-unverified-ssl-context (&optional (proto +tls1.3+))
+  (let* ((ssl-context
+           (java:jstatic "getInstance" "javax.net.ssl.SSLContext" proto))
+         (trm (java:jinterface-implementation
+               "javax.net.ssl.X509TrustManager"
+               "getAcceptedIssuers" (constantly nil)
+               "checkClientTrusted" (constantly (values))
+               "checkServerTrusted" (constantly (values))))
+         (trms (java:jnew-array-from-list
+                "javax.net.ssl.X509TrustManager"
+                (list trm))))
+    (java:jcall "init" ssl-context java:+null+ trms java:+null+)
+    ssl-context))
+
+(defun make-default-ssl-context (&optional (proto +tls1.3+))
+  (let* ((ssl-context
+           (java:jstatic "getInstance" "javax.net.ssl.SSLContext" proto)))
+    (java:jcall "init" ssl-context java:+null+ java:+null+ java:+null+)
+    ssl-context))
+
+(defun make-tls-socket (host port &optional (proto +tls1.3+)
+                                            (verify t))
   (make-instance 'tls-socket
     :socket
     #+abcl
     (let* ((address (java:jstatic "getByName" "java.net.InetAddress" host))
-           (context (java:jstatic "getDefault" "javax.net.ssl.SSLContext"))
+           (context (if verify
+                        (make-default-ssl-context proto)
+                        (make-unverified-ssl-context proto)))
            (factory (java:jcall "getSocketFactory" context))
            (socket (java:jcall "createSocket" factory address port)))
       socket)))
+
+;; Test: ncat --listen --ssl 5555
+;; (defparameter socket (make-tls-socket "localhost" 5555 +tls1.3+ nil))
+;; (defparameter out (make-socket-output-stream socket))
+;; (defparameter in (make-socket-input-stream socket))
+;; (write-sequence (encode::string->octets "hello world") out)
+
 
 (defun make-socket-input-stream (socket)
   (make-instance
