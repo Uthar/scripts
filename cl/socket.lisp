@@ -75,7 +75,7 @@
   (with-slots (%stream) stream
     #+abcl (let ((read (java:jcall "read" %stream)))
              (when (= read -1)
-               (format t "EOF~%")
+               (close stream)
                (error 'end-of-file))
              read)))
 
@@ -83,19 +83,13 @@
                                       sequence start end &key)
   (with-slots (%stream) stream
     #+abcl
-    (format t "length: ~a~%" (length sequence))
-    (format t "start: ~a~%" start)
-    (format t "end: ~A~%" end)
-    (format t "off: ~A~%" start)
-    (format t "len: ~A~%" (- (or end (length sequence)) start))
     (let* ((buf (java:jnew-array "byte" (length sequence)))
            (read (java:jcall "read" %stream buf start (- (or end (length sequence)) start))))
-      (format t "read: ~A~%" (+ start read))
+      
+      (when (< (+ start read) (length sequence))
+        (close stream))
       (if (= read -1)
-          (progn
-            ;; TODO(kasper)L should close stream here?
-            (format t "EOF~%")
-            0)
+          0
           (loop for index below read
                 do (setf (elt sequence (+ start index))
                          (java:jarray-ref buf (+ start index)))
@@ -121,3 +115,6 @@
 
 (defmethod close ((stream socket-stream))
   #+abcl (java:jcall "close" (slot-value stream '%stream)))
+
+;; (defmethod close :before (stream)
+;;   (format t "Closing ~a~%" stream))
