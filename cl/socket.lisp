@@ -5,7 +5,8 @@
   (:shadow :close)
   (:local-nicknames (:gray :trivial-gray-streams)
                     (:a :alexandria-2)
-                    (:b :babel))
+                    (:b :babel)
+                    #+abcl (:j :java))
   (:export
    :socket
    :socket-stream
@@ -72,20 +73,32 @@
 
 (defmethod gray:stream-read-byte ((stream socket-input-stream))
   (with-slots (%stream) stream
-    #+abcl (java:jcall "read" %stream)))
+    #+abcl (let ((read (java:jcall "read" %stream)))
+             (when (= read -1)
+               (format t "EOF~%")
+               (error 'end-of-file))
+             read)))
 
 (defmethod gray:stream-read-sequence ((stream socket-input-stream)
                                       sequence start end &key)
   (with-slots (%stream) stream
     #+abcl
+    (format t "length: ~a~%" (length sequence))
+    (format t "start: ~a~%" start)
+    (format t "end: ~A~%" end)
+    (format t "off: ~A~%" start)
+    (format t "len: ~A~%" (- (or end (length sequence)) start))
     (let* ((buf (java:jnew-array "byte" (length sequence)))
-           (read (java:jcall "read" %stream buf start (or
-                                                       end
-                                                       (length sequence)))))
-      (loop for index below read
-            do (setf (elt sequence (+ start index))
-                     (java:jarray-ref buf (+ start index))))
-      read)))
+           (read (java:jcall "read" %stream buf start (- (or end (length sequence)) start))))
+      (format t "read: ~A~%" (+ start read))
+      (if (= read -1)
+          (progn
+            (format t "EOF~%")
+            0)
+          (loop for index below read
+                do (setf (elt sequence (+ start index))
+                         (java:jarray-ref buf (+ start index)))
+                finally (return (+ start read)))))))
 
 
 (defmethod gray:stream-write-sequence ((stream socket-output-stream)

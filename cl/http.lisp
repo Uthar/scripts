@@ -49,8 +49,7 @@
          (in (sock::make-socket-input-stream socket))
          (payload (params->payload params)))
     (write-sequence (babel:string-to-octets payload) out)
-    (multiple-value-prog1
-        (read-http-response in))))
+    (read-http-response in)))
 
 (defun is-read-line (is)
   (loop
@@ -75,21 +74,14 @@
 (defun read-http-response (is)
   (let* ((control-data (is-read-line is))
          (headers (read-headers is))
-         (content-length (parse-integer
-                          (assoc* "content-length" headers
-                                  :key #'string-downcase
-                                  :test #'string=)
-                          :junk-allowed t)))
-    (if content-length
-        (let ((response (make-byte-array content-length)))
-          (read-sequence response is)
-          (destructuring-bind (version code reason)
-              (split-sequence #\Space control-data)
-            (declare (ignorable version))
-            (values (babel:octets-to-string response)
-                    (parse-integer code)
-                    reason)))
-        (error "not implemented: HTTP requests with no content-length"))))
+         (splits (split-sequence #\Space control-data))
+         (version (first splits))
+         (code (second splits))
+         (reason (third splits)))
+      (values is
+              (parse-integer code)
+              reason
+              version)))
 
                                           
 (defun string->bytes (string)
