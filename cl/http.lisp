@@ -86,7 +86,9 @@
           (destructuring-bind (version code reason)
               (split-sequence #\Space control-data)
             (declare (ignorable version))
-            (values (babel:octets-to-string response) code reason)))
+            (values (babel:octets-to-string response)
+                    (parse-integer code)
+                    reason)))
         (error "not implemented: HTTP requests with no content-length"))))
 
                                           
