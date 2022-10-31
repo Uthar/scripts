@@ -76,7 +76,9 @@
       (cond
         ((string= method "HEAD") "")
         (chunkedp (read-chunks stream))
-        (content-length (read-content-length-response stream))
+        (content-length (read-content-length-response
+                         stream
+                         (parse-integer content-length)))
         (t (read-response stream))))))
     
 (defun read-chunks (stream)
@@ -107,8 +109,10 @@
     chunk))
 
 (defun read-content-length-response (stream length)
-  (let ((response (make-byte-array length)))
-    (assert (= length (read-sequence response stream)))
+  (let* ((response (make-byte-array length))
+         (position (read-sequence response stream)))
+    (while (< position length)
+      (setf position (read-sequence response stream :start position)))
     (encode:octets->string response)))
 
 (defun read-response (stream)
