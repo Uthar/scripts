@@ -59,8 +59,14 @@
   ;; TODO(kasper): should handle Content-Length
   ;; TODO(kasper): should handle Content-Encoding
   ;; TODO(kasper): streaming encode
-  (encode:octets->string
-   (read-stream-content-into-byte-vector (request params))))
+  (let ((stream (request params)))
+    ;; TODO(kasper): Why does it return incomplete response without the wait?
+    ;; TODO(kasper): Move socket closing from socket code to here
+    (unwind-protect
+         (loop repeat 10
+               with buf = (make-byte-array 4096)
+               do (progn (read-sequence buf stream) (sleep 0.1)))
+      (socket:close stream))))
 
 (defun is-read-line (is)
   (loop

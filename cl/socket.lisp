@@ -122,7 +122,7 @@
   (with-slots (%stream) stream
     #+abcl (let ((read (java:jcall "read" %stream)))
              (when (= read -1)
-               (close stream)
+               ;; (close stream)
                (error 'end-of-file))
              read)))
 
@@ -132,10 +132,11 @@
     #+abcl
     (let* ((buf (java:jnew-array "byte" (length sequence)))
            (read (java:jcall "read" %stream buf start (- (or end (length sequence)) start))))
-      
-      (when (< (+ start read) (length sequence))
-        (close stream))
+      (format t "read ~A bytes~%" read)
+      ;; (when (< (+ start read) (length sequence))
+      ;;   (close stream))
       (if (= read -1)
+          ;; (prog1 0 (close stream))
           0
           (loop for index below read
                 do (setf (elt sequence (+ start index))
@@ -163,5 +164,5 @@
 (defmethod close ((stream socket-stream))
   #+abcl (java:jcall "close" (slot-value stream '%stream)))
 
-;; (defmethod close :before (stream)
-;;   (format t "Closing ~a~%" stream))
+(defmethod close :before (stream)
+  (format t "Closing ~a~%" stream))
