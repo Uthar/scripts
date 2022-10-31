@@ -73,11 +73,11 @@
            (method (assoc* 'method params)))
       (assert (string= version +http/1.1+))
       (assert (not (and content-length chunkedp)))
-      (format t "headers ~A~%" headers)
-      (format t "transfer-encoding ~A~%" transfer-encoding)
-      (format t "method ~A~%" method)
-      (format t "chunkedp ~A~%" chunkedp)
-      (format t "content-length ~A~%" content-length)
+      ;; (format t "headers ~A~%" headers)
+      ;; (format t "transfer-encoding ~A~%" transfer-encoding)
+      ;; (format t "method ~A~%" method)
+      ;; (format t "chunkedp ~A~%" chunkedp)
+      ;; (format t "content-length ~A~%" content-length)
       (cond
         ((string= method "HEAD") "")
         (chunkedp (read-chunks stream))
@@ -93,7 +93,7 @@
 (defun read-chunks (stream)
   (loop with whole = (make-byte-array 0)
         with buf = (make-byte-array 4096)
-        for line = (print (is-read-line stream))
+        for line = (is-read-line stream)
         for chunk-length = (parse-integer
                             (string-trim " " (first (split-sequence #\; line)))
                             :radix 16)
@@ -111,7 +111,8 @@
          (position (read-sequence chunk stream)))
     (while (< position length)
       (setf position (read-sequence chunk stream :start position)))
-    (format t "skipping line: ~A~%" (is-read-line stream))
+    ;; Skip CRLF
+    (is-read-line stream)
     chunk))
 
 (defun read-content-length-response (stream length)
