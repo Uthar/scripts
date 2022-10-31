@@ -55,23 +55,73 @@
     (write-sequence (encode:string->octets payload) out)
     (read-http-response in)))
 
+(defun strassoc (&rest args)
+  (apply #'assoc `(,@args :test ,#'equalp)))
+
+(defun strassoc* (&rest args)
+  (cdr (apply #'strassoc args)))
+
 (defun request* (params)
   ;; TODO(kasper): should handle Content-Length
   ;; TODO(kasper): should handle Content-Encoding
   ;; TODO(kasper): streaming encode
-  (let ((stream (request params)))
-    ;; TODO(kasper): Why does it return incomplete response without the wait?
-    ;; That's because alexandria:read-stream-contents-into-byte-vector
-    ;; returns as soon as there is less bytes read in than the length
-    ;; of the buffer, which conflicts with HTTP chunked transport encoding.
-    ;;
-    ;; TODO(kasper): Move socket closing from socket code to here
-    (unwind-protect
-         (loop repeat 10
-               with buf = (make-byte-array 4096)
-               do (progn (read-sequence buf stream) (sleep 0.1)))
-      (socket:close stream))))
+  (multiple-value-bind (stream code reason headers version)
+      (request params)
+    (let* ((transfer-encoding (strassoc* "Transfer-Encoding" headers))
+           (chunkedp (equalp transfer-encoding "chunked"))
+           (content-length (strassoc* "Content-Length" headers))
+           (method (assoc* 'method params)))
+      (assert (string= version +http/1.1+))
+      (assert (not (and content-length chunkedp)))
+      (format t "headers ~A~%" headers)
+      (format t "transfer-encoding ~A~%" transfer-encoding)
+      (format t "method ~A~%" method)
+      (format t "chunkedp ~A~%" chunkedp)
+      (format t "content-length ~A~%" content-length)
+      (cond
+        ((string= method "HEAD") "")
+        (chunkedp (read-chunks stream))
+        (content-length (read-content-length-response stream))
+        (t (read-response stream))))))
+    
+    ;; (unwind-protect
+    ;;      (loop repeat 10
+    ;;            with buf = (make-byte-array 4096)
+    ;;            do (progn (read-sequence buf stream) (sleep 0.1)))
+    ;;   (socket:close stream))))
 
+(defun read-chunks (stream)
+  (loop with whole = (make-byte-array 0)
+        with buf = (make-byte-array 4096)
+        for line = (print (is-read-line stream))
+        for chunk-length = (parse-integer
+                            (string-trim " " (first (split-sequence #\; line)))
+                            :radix 16)
+        while (plusp chunk-length)
+        for chunk = (read-chunk stream chunk-length)
+        ;; FIXME(kasper): slow
+        do (setf whole (concatenate 'vector whole chunk))
+        finally (return (encode:octets->string whole))))
+
+(defmacro while (test &body body)
+  `(loop while ,test do (progn ,@body)))
+
+(defun read-chunk (stream length)
+  (let* ((chunk (make-byte-array length))
+         (position (read-sequence chunk stream)))
+    (while (< position length)
+      (setf position (read-sequence chunk stream :start position)))
+    (format t "skipping line: ~A~%" (is-read-line stream))
+    chunk))
+
+(defun read-content-length-response (stream length)
+  (let ((response (make-byte-array length)))
+    (assert (= length (read-sequence response stream)))
+    (encode:octets->string response)))
+
+(defun read-response (stream)
+  (encode:octets->string (read-stream-content-into-byte-vector stream)))
+  
 (defun is-read-line (is)
   (loop
     for byte = (read-byte is)
