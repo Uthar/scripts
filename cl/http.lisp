@@ -61,6 +61,10 @@
   ;; TODO(kasper): streaming encode
   (let ((stream (request params)))
     ;; TODO(kasper): Why does it return incomplete response without the wait?
+    ;; That's because alexandria:read-stream-contents-into-byte-vector
+    ;; returns as soon as there is less bytes read in than the length
+    ;; of the buffer, which conflicts with HTTP chunked transport encoding.
+    ;;
     ;; TODO(kasper): Move socket closing from socket code to here
     (unwind-protect
          (loop repeat 10
