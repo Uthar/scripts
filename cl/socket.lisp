@@ -122,7 +122,7 @@
   (with-slots (%stream) stream
     #+abcl (let ((read (java:jcall "read" %stream)))
              (when (= read -1)
-               ;; (close stream)
+               (close stream)
                (error 'end-of-file))
              read)))
 
@@ -136,8 +136,8 @@
       ;; (when (< (+ start read) (length sequence))
       ;;   (close stream))
       (if (= read -1)
-          ;; (prog1 0 (close stream))
-          0
+          (prog1 0 (close stream) (error 'end-of-file))
+          ;; 0
           (loop for index below read
                 do (setf (elt sequence (+ start index))
                          (java:jarray-ref buf (+ start index)))
