@@ -73,25 +73,14 @@
            (method (assoc* 'method params)))
       (assert (string= version +http/1.1+))
       (assert (not (and content-length chunkedp)))
-      ;; (format t "headers ~A~%" headers)
-      ;; (format t "transfer-encoding ~A~%" transfer-encoding)
-      ;; (format t "method ~A~%" method)
-      ;; (format t "chunkedp ~A~%" chunkedp)
-      ;; (format t "content-length ~A~%" content-length)
       (cond
         ((string= method "HEAD") "")
         (chunkedp (read-chunks stream))
         (content-length (read-content-length-response stream))
         (t (read-response stream))))))
     
-    ;; (unwind-protect
-    ;;      (loop repeat 10
-    ;;            with buf = (make-byte-array 4096)
-    ;;            do (progn (read-sequence buf stream) (sleep 0.1)))
-    ;;   (socket:close stream))))
-
 (defun read-chunks (stream)
-  (loop with whole = (make-byte-array 0)
+  (loop with whole = (make-byte-array 0 :adjustable t)
         with buf = (make-byte-array 4096)
         for line = (is-read-line stream)
         for chunk-length = (parse-integer
@@ -99,8 +88,10 @@
                             :radix 16)
         while (plusp chunk-length)
         for chunk = (read-chunk stream chunk-length)
-        ;; FIXME(kasper): slow
-        do (setf whole (concatenate 'vector whole chunk))
+        do (let ((position (length whole)))
+             (adjust-array whole (+ (length whole)
+                                    (length chunk)))
+             (replace whole chunk :start1 position))
         finally (return (encode:octets->string whole))))
 
 (defmacro while (test &body body)
