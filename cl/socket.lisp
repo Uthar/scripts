@@ -131,7 +131,9 @@
   (with-slots (%stream) stream
     #+abcl
     (let* ((buf (java:jnew-array "byte" (length sequence)))
-           (read (java:jcall "read" %stream buf start (- (or end (length sequence)) start))))
+           (read (java:jcall "read" %stream buf start (- (or end
+                                                             (length sequence))
+                                                         start))))
       (format t "read ~A bytes~%" read)
       ;; (when (< (+ start read) (length sequence))
       ;;   (close stream))
