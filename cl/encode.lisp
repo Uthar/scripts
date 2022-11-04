@@ -11,7 +11,9 @@
   (java:jcall
    "toString"
    (java:jnew "java.lang.String"
-              (java:jnew-array-from-array "byte" array) "UTF-8")))
+              (java:jnew-array-from-array "byte" array) "UTF-8"))
+  #+sbcl
+  (sb-ext:octets-to-string array))
 
 #+abcl
 (defun jarray->byte-array (jarray)
@@ -24,4 +26,5 @@
     finally (return array)))
 
 (defun string->octets (string)
-  (jarray->byte-array (java:jcall "getBytes" string)))
+  #+abcl (jarray->byte-array (java:jcall "getBytes" string))
+  #+sbcl (sb-ext:string-to-octets string))
