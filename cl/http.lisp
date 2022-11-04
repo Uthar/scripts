@@ -46,8 +46,6 @@
 (defvar *connections*
   (make-concurrent-hash-table))
 
-(gethash "www.gnu.org-443-HTTPS" *connections*)
-
 (defun cache-connection (connection &rest cache-keys)
   (let ((cache-key (apply #'concatenate 'string
                           (interpose 'list "-" cache-keys))))
@@ -132,7 +130,6 @@
     
 (defun read-chunks (stream)
   (loop with whole = (make-byte-array 0 :adjustable t)
-        with buf = (make-byte-array 4096)
         for line = (is-read-line stream)
         for chunk-length = (parse-integer
                             (string-trim " " (first (split-sequence #\; line)))
