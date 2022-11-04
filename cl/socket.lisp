@@ -18,6 +18,7 @@
    :make-tls-socket
    :make-socket-input-stream
    :make-socket-output-stream
+   :nagle-p
    :socket-close))
 
 (in-package socket)
@@ -184,3 +185,10 @@
 
 (defmethod socket-close :before (stream)
   (format t "Closing ~a~%" stream))
+
+(defmethod nagle-p ((socket socket))
+  #+abcl (not (java:jcall "getTcpNoDelay" (slot-value socket '%socket))))
+
+(defmethod (setf nagle-p) (nagle-p (socket socket))
+  (assert (or (eql nil nagle-p) (eql t nagle-p)))
+  #+abcl (java:jcall "setTcpNoDelay" (slot-value socket '%socket) (not nagle-p)))

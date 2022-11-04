@@ -70,6 +70,7 @@
          (out (socket:make-socket-output-stream socket))
          (in (socket:make-socket-input-stream socket))
          (payload (params->payload params)))
+    (setf (socket::nagle-p socket) nil)
     (write-sequence (encode:string->octets payload) out)
     (read-http-response in)))
 
@@ -86,14 +87,13 @@
       (handler-case
           (apply func args)
         (error (e)
-          (format t "~%~%~%~%Clearing connection cache after ~a~%" e)
           (java:jcall "clear" *connections*)
           (when (< *retries* 5)
             (invoke-restart 'retry e args))))
     (retry (c args)
+      (sleep (* 3 *retries*))
       (let ((*retries* (1+ *retries*)))
-        (format t "~%~%~%~%Retry x~a after ~a~%" *retries* c)
-        (sleep (* 3 *retries*))
+        (format t "Retry x~a after ~a~%" *retries* c)
         (apply #'call-with-retrying func args)))))
 
 (defun request* (params)
