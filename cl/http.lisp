@@ -3,6 +3,8 @@
   (:documentation "RFC9110 client implementation")
   (:use :cl :alexandria)
   (:import-from :split-sequence :split-sequence)
+  (:shadowing-import-from :concurrent :gethash :clrhash)
+  (:import-from :concurrent :make-concurrent-hash-table)
   (:export
    :request
    :request*))
@@ -42,17 +44,22 @@
 ;; control data is sent as the first line of a message
 
 (defvar *connections*
-  (java:jnew "java.util.concurrent.ConcurrentHashMap"))
+  (make-concurrent-hash-table))
+
+(gethash "www.gnu.org-443-HTTPS" *connections*)
 
 (defun cache-connection (connection &rest cache-keys)
   (let ((cache-key (apply #'concatenate 'string
                           (interpose 'list "-" cache-keys))))
-    (java:jcall "putIfAbsent" *connections* cache-key connection)))
+    (setf (gethash cache-key *connections*) connection)))
 
 (defun get-cached-connection (&rest cache-keys)
   (let ((cache-key (apply #'concatenate 'string
                           (interpose 'list "-" cache-keys))))
-    (java:jcall "get" *connections* cache-key)))
+    (format t "trying to reuse connection ~A~%" cache-key)
+    (when-let ((conn (gethash cache-key *connections*)))
+      (format t "reusing cached connection ~A~%" conn)
+      conn)))
   
 (defun request (params)
   (let* ((host (assoc* 'host params))
@@ -70,7 +77,7 @@
          (out (socket:make-socket-output-stream socket))
          (in (socket:make-socket-input-stream socket))
          (payload (params->payload params)))
-    (setf (socket::nagle-p socket) nil)
+    (setf (socket:nagle-p socket) nil)
     (write-sequence (encode:string->octets payload) out)
     (read-http-response in)))
 
@@ -87,7 +94,7 @@
       (handler-case
           (apply func args)
         (error (e)
-          (java:jcall "clear" *connections*)
+          (clrhash *connections*)
           (when (< *retries* 5)
             (invoke-restart 'retry e args))))
     (retry (c args)
