@@ -41,14 +41,32 @@
 ;; 6.2.  Control Data
 ;; control data is sent as the first line of a message
 
+(defvar *connections*
+  (java:jnew "java.util.concurrent.ConcurrentHashMap"))
+
+(defun cache-connection (connection &rest cache-keys)
+  (let ((cache-key (apply #'concatenate 'string
+                          (interpose 'list "-" cache-keys))))
+    (java:jcall "putIfAbsent" *connections* cache-key connection)))
+
+(defun get-cached-connection (&rest cache-keys)
+  (let ((cache-key (apply #'concatenate 'string
+                          (interpose 'list "-" cache-keys))))
+    (java:jcall "get" *connections* cache-key)))
+  
 (defun request (params)
   (let* ((host (assoc* 'host params))
          (port (assoc* 'port params))
          (proto (assoc* 'proto params))
-         (socket (case proto
+         (socket (or
+                  (get-cached-connection
+                   host
+                   (write-to-string port)
+                   (write-to-string proto))
+                  (case proto
                    (http (socket:make-socket host port))
                    (https (socket:make-tls-socket host port))
-                   (otherwise (socket:make-socket host port))))
+                   (otherwise (socket:make-socket host port)))))
          (out (socket:make-socket-output-stream socket))
          (in (socket:make-socket-input-stream socket))
          (payload (params->payload params)))
@@ -61,6 +79,23 @@
 (defun strassoc* (&rest args)
   (cdr (apply #'strassoc args)))
 
+(defparameter *retries* 0)
+
+(defun call-with-retrying (func &rest args)
+  (restart-case
+      (handler-case
+          (apply func args)
+        (error (e)
+          (format t "~%~%~%~%Clearing connection cache after ~a~%" e)
+          (java:jcall "clear" *connections*)
+          (when (< *retries* 5)
+            (invoke-restart 'retry e args))))
+    (retry (c args)
+      (let ((*retries* (1+ *retries*)))
+        (format t "~%~%~%~%Retry x~a after ~a~%" *retries* c)
+        (sleep (* 3 *retries*))
+        (apply #'call-with-retrying func args)))))
+
 (defun request* (params)
   ;; TODO(kasper): should handle Content-Length
   ;; TODO(kasper): should handle Content-Encoding
@@ -70,9 +105,16 @@
     (let* ((transfer-encoding (strassoc* "Transfer-Encoding" headers))
            (chunkedp (equalp transfer-encoding "chunked"))
            (content-length (strassoc* "Content-Length" headers))
+           (connection (strassoc* "Connection" headers))
+           (keep-alive-p (equalp connection "keep-alive"))
            (method (assoc* 'method params)))
       (assert (string= version +http/1.1+))
       (assert (not (and content-length chunkedp)))
+      (when keep-alive-p
+        (cache-connection (slot-value stream 'socket::socket)
+                          (assoc-value params 'host)
+                          (write-to-string (assoc-value params 'port))
+                          (write-to-string (assoc-value params 'proto))))
       (cond
         ((string= method "HEAD") "")
         (chunkedp (read-chunks stream))
@@ -94,7 +136,18 @@
              (adjust-array whole (+ (length whole)
                                     (length chunk)))
              (replace whole chunk :start1 position))
-        finally (return (encode:octets->string whole))))
+        finally (return (prog1 (encode:octets->string whole)
+                          ;; Check for trailers
+                          (unless (string= "" (is-read-line stream))
+                            (read-trailers stream)
+                            (is-read-line stream))))))
+
+(defun read-trailers (stream)
+  (loop 
+    for trailer = (is-read-line stream)
+    collecting trailer into trailers
+    if (string= trailer "")
+      do (return (butlast trailers))))
 
 (defmacro while (test &body body)
   `(loop while ,test do (progn ,@body)))

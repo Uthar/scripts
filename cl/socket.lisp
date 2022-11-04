@@ -8,19 +8,17 @@
                     #+abcl (:j :java))
   (:export
    :socket
+   :server-socket
+   :tls-socket
    :socket-stream
-   :make-socket
-   :make-tls-socket
    :socket-input-stream
    :socket-output-stream
+   :make-socket
+   :make-server-socket
+   :make-tls-socket
    :make-socket-input-stream
    :make-socket-output-stream
-   :close
-   :bind
-   :connect
-   :closed-p
-   :connected-p
-   :bound-p))
+   :socket-close))
 
 (in-package socket)
 
@@ -49,6 +47,7 @@
 
 (defparameter +tls1.3+ "TLSv1.3")
 
+#+abcl
 (defun make-unverified-ssl-context (&optional (proto +tls1.3+))
   (let* ((ssl-context
            (java:jstatic "getInstance" "javax.net.ssl.SSLContext" proto))
@@ -63,6 +62,7 @@
     (java:jcall "init" ssl-context java:+null+ trms java:+null+)
     ssl-context))
 
+#+abcl
 (defun make-default-ssl-context (&optional (proto +tls1.3+))
   (let* ((ssl-context
            (java:jstatic "getInstance" "javax.net.ssl.SSLContext" proto)))
@@ -71,16 +71,20 @@
 
 (defun make-tls-socket (host port &optional (proto +tls1.3+)
                                             (verify t))
-  (make-instance 'tls-socket
-    :socket
-    #+abcl
-    (let* ((address (java:jstatic "getByName" "java.net.InetAddress" host))
-           (context (if verify
-                        (make-default-ssl-context proto)
-                        (make-unverified-ssl-context proto)))
-           (factory (java:jcall "getSocketFactory" context))
-           (socket (java:jcall "createSocket" factory address port)))
-      socket)))
+  (handler-case
+      (make-instance
+       'tls-socket
+       :socket
+       #+abcl
+       (let* ((address (java:jstatic "getByName" "java.net.InetAddress" host))
+              (context (if verify
+                           (make-default-ssl-context proto)
+                           (make-unverified-ssl-context proto)))
+              (factory (java:jcall "getSocketFactory" context))
+              (socket (java:jcall "createSocket" factory address port)))
+         socket))
+    (java:java-exception (e)
+      (error 'end-of-file e))))
 
 ;; Test: ncat --listen --ssl 5555
 ;; (defparameter socket (make-tls-socket "localhost" 5555 +tls1.3+ nil))
@@ -95,7 +99,11 @@
    :socket socket
    :stream
    #+abcl
-   (java:jcall "getInputStream" (slot-value socket '%socket))))
+   (handler-case
+       (java:jcall "getInputStream" (slot-value socket '%socket))
+     (java:java-exception (e)
+       (socket:socket-close socket)
+       (error 'end-of-file)))))
                 
 (defun make-socket-output-stream (socket)
   (make-instance
@@ -103,7 +111,11 @@
    :socket socket
    :stream
    #+abcl
-   (java:jcall "getOutputStream" (slot-value socket '%socket))))
+   (handler-case
+       (java:jcall "getOutputStream" (slot-value socket '%socket))
+     (java:java-exception (e)
+       (socket:socket-close socket)
+       (error 'end-of-file)))))
 
 (defclass socket-stream (gray:fundamental-binary-stream)
   ((socket :initarg :socket :initform (error "socket required"))
@@ -120,51 +132,55 @@
 
 (defmethod gray:stream-read-byte ((stream socket-input-stream))
   (with-slots (%stream) stream
-    #+abcl (let ((read (java:jcall "read" %stream)))
-             (when (= read -1)
-               (close stream)
-               (error 'end-of-file))
-             read)))
+    #+abcl
+    (handler-case
+        (let ((read (java:jcall "read" %stream)))
+          (when (= read -1)
+            (socket:socket-close stream)
+            (error 'end-of-file))
+          read)
+      (java:java-exception (e)
+        (socket:socket-close stream)
+        (error 'end-of-file)))))
 
 (defmethod gray:stream-read-sequence ((stream socket-input-stream)
                                       sequence start end &key)
   (with-slots (%stream) stream
     #+abcl
-    (let* ((buf (java:jnew-array "byte" (length sequence)))
-           (read (java:jcall "read" %stream buf start (- (or end
-                                                             (length sequence))
-                                                         start))))
-      (format t "read ~A bytes~%" read)
-      ;; (when (< (+ start read) (length sequence))
-      ;;   (close stream))
-      (if (= read -1)
-          (prog1 0 (close stream) (error 'end-of-file))
-          ;; 0
-          (loop for index below read
-                do (setf (elt sequence (+ start index))
-                         (java:jarray-ref buf (+ start index)))
-                finally (return (+ start read)))))))
+    (handler-case
+        (let* ((buf (java:jnew-array "byte" (length sequence)))
+               (read (java:jcall "read" %stream buf start (- (or end
+                                                                 (length sequence))
+                                                             start))))
+          (if (= read -1)
+              (prog1 0 (socket:socket-close stream) (error 'end-of-file))
+              ;; 0
+              (loop for index below read
+                    do (setf (elt sequence (+ start index))
+                             (java:jarray-ref buf (+ start index)))
+                    finally (return (+ start read)))))
+      (java:java-exception (e)
+        (socket:socket-close stream)
+        (error 'end-of-file)))))
 
 
 (defmethod gray:stream-write-sequence ((stream socket-output-stream)
                                        sequence start end &key)
   (with-slots (%stream) stream
     #+abcl
-    (let ((jarray (java:jnew-array-from-list "byte" (coerce sequence 'list))))
-      (java:jcall "write" %stream jarray start (or end (length sequence)))
-      sequence)))
+    (handler-case
+        (let ((jarray (java:jnew-array-from-list "byte" (coerce sequence 'list))))
+          (java:jcall "write" %stream jarray start (or end (length sequence)))
+          sequence)
+      (java:java-exception (e)
+        (socket:socket-close stream)
+        (error 'end-of-file)))))
 
-(defmethod accept ((server server-socket))
-  (make-instance
-   'socket
-   :socket
-   #+abcl (java:jcall "accept" (slot-value server '%socket))))
-
-(defmethod close ((socket socket))
+(defmethod socket-close ((socket socket))
   #+abcl (java:jcall "close" (slot-value socket '%socket)))
 
-(defmethod close ((stream socket-stream))
+(defmethod socket-close ((stream socket-stream))
   #+abcl (java:jcall "close" (slot-value stream '%stream)))
 
-(defmethod close :before (stream)
+(defmethod socket-close :before (stream)
   (format t "Closing ~a~%" stream))
