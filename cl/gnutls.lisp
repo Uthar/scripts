@@ -91,6 +91,8 @@
 
 (defparameter +gnutls-crd-certificate+ 1)
 
+(defparameter +gnutls-e-again+ -28)
+
 ;;;;
 
 (defparameter session (cffi:foreign-alloc :pointer))
@@ -170,7 +172,7 @@
    (cffi:get-callback 'pull-timeout-func))
 
   (loop for err = (gnutls-handshake (cffi:mem-ref session :pointer))
-        while (= err -28)
+        while (= err +gnutls-e-again+)
         finally (return err))
   ;; => -50
 
