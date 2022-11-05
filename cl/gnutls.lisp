@@ -97,7 +97,9 @@
 
 (defparameter session (cffi:foreign-alloc :pointer))
 (defparameter xcred (cffi:foreign-alloc :pointer))
-(defparameter *buf* (make-array 4096 :adjustable t :fill-pointer 0))
+(defvar socket (socket:make-socket "127.0.0.1" 5555))
+(defvar *out* (socket:make-socket-output-stream socket))
+(defvar *in* (socket:make-socket-input-stream socket))
 
 (when (zerop (gnutls-check-version "3.4.6"))
   (warn "Unsupported GnuTLS version. Expect problems."))
@@ -107,9 +109,11 @@
                                     (size :size))
   (declare (ignorable transport-ptr))
   (print "push-func called")
+  ;; TODO(kasper): buffering
   (loop for index below size
-        do (vector-push-extend (cffi:mem-ref buf :char index) *buf*))
-  (format t "~% Done writing ~A bytes~%" size)
+        do (format t "write byte ~A~%" (cffi:mem-ref buf :unsigned-char index))
+        do (write-byte (cffi:mem-ref buf :unsigned-char index) *out*))
+  ;; (format t "~% Done writing ~A bytes~%" size)
   size)
 
 (cffi:defcallback vec-push-func :ssize ((transport-ptr :pointer)
@@ -118,19 +122,22 @@
   (declare (ignorable transport-ptr))
   (print "vec-push-func called")
   (cffi:with-foreign-slots ((iov_base iov_len) iov (:struct giovec_t))
+    ;; TODO(kasper): buffering
     (loop for index below iovcnt
-          do (vector-push-extend (cffi:mem-ref iov_base :char index) *buf*))
-    (format t "~% Done writing ~A bytes~%" iovcnt)
+          do (format t "write byte ~A~%" (cffi:mem-ref iov_base :unsigned-char index))          
+          do (write-byte (cffi:mem-ref iov_base :unsigned-char index) *out*))
+    ;; (format t "~% Done writing ~A bytes~%" iovcnt)
     iovcnt))
 
 (cffi:defcallback pull-func :ssize ((transport-ptr :pointer)
                                     (buf :pointer)
                                     (size :size))
   (declare (ignorable transport-ptr))
-  (format t "pull-func called: ~A~%" transport-ptr)  
+  ;; (format t "pull-func called: ~A~%" transport-ptr)
+  ;; TODO(kasper): buffering
   (loop for index below size
-        do (setf (cffi:mem-ref buf :char index)
-                 (aref *buf* index)))
+        do (setf (cffi:mem-ref buf :unsigned-char index)
+                 (read-byte *in*)))
   (format t "~% Done reading ~A bytes~%" size)
   size)
 
@@ -138,7 +145,8 @@
                                           (ms :uint))
   (declare (ignorable ms transport-ptr))
   (print "pull-timeout-func called")
-  (fill-pointer *buf*))
+  ;; TODO(kasper): implement properly
+  32)
 
 (defun init-gnutls ()
 
@@ -148,7 +156,6 @@
   (gnutls-certificate-set-x509-system-trust (cffi:mem-ref xcred :pointer))
   
   (gnutls-init session (logior +gnutls-client+))
-  ;; (gnutls-server-name-set
   (gnutls-set-default-priority (cffi:mem-ref session :pointer))
   (gnutls-credentials-set (cffi:mem-ref session :pointer)
                           +gnutls-crd-certificate+
@@ -176,10 +183,7 @@
 
   (loop for err = (gnutls-handshake (cffi:mem-ref session :pointer))
         while (= err +gnutls-e-again+)
-        finally (return err))
-  ;; => -50
-
-  )
+        finally (return err)))
 
 ;; GNUTLS_ENABLE_EARLY_START
 ;; gnutls_anty_replay_init
