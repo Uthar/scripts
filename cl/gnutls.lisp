@@ -137,9 +137,12 @@
                                     (buf :pointer)
                                     (size :size))
   (declare (ignorable transport-ptr))
-  (loop for index below size
-        do (setf (cffi:mem-ref buf :unsigned-char index)
-                 (read-byte *in*)))
+  (loop
+    with bytes = (make-array size :element-type '(unsigned-byte 8))
+    initially (read-sequence bytes *in*)
+    for index below size
+    do (setf (cffi:mem-ref buf :unsigned-char index)
+             (aref bytes index)))
   size)
 
 ;; (cffi:defcallback pull-timeout-func :int ((transport-ptr :pointer)
