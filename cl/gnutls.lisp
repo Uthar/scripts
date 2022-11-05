@@ -59,6 +59,13 @@
   (data :pointer)
   (size :size))
 
+(cffi:defcfun "gnutls_error_is_fatal" :int
+  (err :int))
+
+(cffi:defcfun "gnutls_record_send" :int
+  (session :pointer)
+  (msg :string)
+  (len :size))
 
 (cffi:defcstruct giovec_t
   (iov_base :pointer)
@@ -101,7 +108,7 @@
 (defvar *out* (socket:make-socket-output-stream socket))
 (defvar *in* (socket:make-socket-input-stream socket))
 
-(when (zerop (gnutls-check-version "3.4.6"))
+(when (zerop (gnutls-check-version "3.6.5"))
   (warn "Unsupported GnuTLS version. Expect problems."))
 
 (cffi:defcallback push-func :ssize ((transport-ptr :pointer)
@@ -153,6 +160,15 @@
   (gnutls-global-init)
   
   (gnutls-certificate-allocate-credentials xcred)
+
+  ;; Or:
+  ;; gnutls_certificate_set_verify_flags(backend->cred,
+  ;; GNUTLS_VERIFY_ALLOW_X509_V1_CA_CRT)
+  ;;
+  ;; gnutls_certificate_set_x509_trust_file(backend->cred,
+  ;; SSL_CONN_CONFIG(CAfile),
+  ;; GNUTLS_X509_FMT_PEM)
+  
   (gnutls-certificate-set-x509-system-trust (cffi:mem-ref xcred :pointer))
   
   (gnutls-init session (logior +gnutls-client+))
@@ -182,8 +198,12 @@
    (cffi:get-callback 'pull-timeout-func))
 
   (loop for err = (gnutls-handshake (cffi:mem-ref session :pointer))
-        while (= err +gnutls-e-again+)
-        finally (return err)))
+        while (and (< err 0) (zerop (gnutls-version-is-fatal err)))
+        finally (return err))
+
+  (gnutls-record-send (cffi:mem-ref session :pointer)
+                      "hello world"
+                      (length "hello world"))
 
 ;; GNUTLS_ENABLE_EARLY_START
 ;; gnutls_anty_replay_init
