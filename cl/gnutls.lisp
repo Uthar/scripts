@@ -169,8 +169,9 @@
    (cffi:mem-ref session :pointer)
    (cffi:get-callback 'pull-timeout-func))
 
-  (let ((err (gnutls-handshake (cffi:mem-ref session :pointer))))
-    err)
+  (loop for err = (gnutls-handshake (cffi:mem-ref session :pointer))
+        while (= err -28)
+        finally (return err))
   ;; => -50
 
   )
