@@ -197,6 +197,8 @@
    (cffi:mem-ref session :pointer)
    (cffi:get-callback 'pull-timeout-func))
 
+  ;; TODO(kasper): add session restore
+  
   (loop for err = (gnutls-handshake (cffi:mem-ref session :pointer))
         while (and (< err 0) (zerop (gnutls-version-is-fatal err)))
         finally (return err))
