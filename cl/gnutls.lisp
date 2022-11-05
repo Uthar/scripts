@@ -115,26 +115,23 @@
                                     (buf :pointer)
                                     (size :size))
   (declare (ignorable transport-ptr))
-  (print "push-func called")
-  ;; TODO(kasper): buffering
   (loop for index below size
-        do (format t "write byte ~A~%" (cffi:mem-ref buf :unsigned-char index))
-        do (write-byte (cffi:mem-ref buf :unsigned-char index) *out*))
-  ;; (format t "~% Done writing ~A bytes~%" size)
+        collect (cffi:mem-ref buf :unsigned-char index) into bytes
+        finally (write-sequence bytes *out*))
   size)
 
-(cffi:defcallback vec-push-func :ssize ((transport-ptr :pointer)
-                                        (iov :pointer)
-                                        (iovcnt :int))
-  (declare (ignorable transport-ptr))
-  (print "vec-push-func called")
-  (cffi:with-foreign-slots ((iov_base iov_len) iov (:struct giovec_t))
-    ;; TODO(kasper): buffering
-    (loop for index below iovcnt
-          do (format t "write byte ~A~%" (cffi:mem-ref iov_base :unsigned-char index))          
-          do (write-byte (cffi:mem-ref iov_base :unsigned-char index) *out*))
-    ;; (format t "~% Done writing ~A bytes~%" iovcnt)
-    iovcnt))
+;; (cffi:defcallback vec-push-func :ssize ((transport-ptr :pointer)
+;;                                         (iov :pointer)
+;;                                         (iovcnt :int))
+;;   (declare (ignorable transport-ptr))
+;;   (print "vec-push-func called")
+;;   (cffi:with-foreign-slots ((iov_base iov_len) iov (:struct giovec_t))
+;;     ;; TODO(kasper): buffering
+;;     (loop for index below iovcnt
+;;           do (format t "write byte ~A~%" (cffi:mem-ref iov_base :unsigned-char index))          
+;;           do (write-byte (cffi:mem-ref iov_base :unsigned-char index) *out*))
+;;     ;; (format t "~% Done writing ~A bytes~%" iovcnt)
+;;     iovcnt))
 
 (cffi:defcallback pull-func :ssize ((transport-ptr :pointer)
                                     (buf :pointer)
@@ -148,12 +145,12 @@
   (format t "~% Done reading ~A bytes~%" size)
   size)
 
-(cffi:defcallback pull-timeout-func :int ((transport-ptr :pointer)
-                                          (ms :uint))
-  (declare (ignorable ms transport-ptr))
-  (print "pull-timeout-func called")
-  ;; TODO(kasper): implement properly
-  32)
+;; (cffi:defcallback pull-timeout-func :int ((transport-ptr :pointer)
+;;                                           (ms :uint))
+;;   (declare (ignorable ms transport-ptr))
+;;   (print "pull-timeout-func called")
+;;   ;; TODO(kasper): implement properly
+;;   32)
 
 (defun init-gnutls ()
 
@@ -185,17 +182,17 @@
    (cffi:mem-ref session :pointer)
    (cffi:get-callback 'push-func))
 
-  (gnutls-transport-set-vec-push-function
-   (cffi:mem-ref session :pointer)
-   (cffi:get-callback 'vec-push-func))
+  ;; (gnutls-transport-set-vec-push-function
+  ;;  (cffi:mem-ref session :pointer)
+  ;;  (cffi:get-callback 'vec-push-func))
 
   (gnutls-transport-set-pull-function
    (cffi:mem-ref session :pointer)
    (cffi:get-callback 'pull-func))
 
-  (gnutls-transport-set-pull-timeout-function
-   (cffi:mem-ref session :pointer)
-   (cffi:get-callback 'pull-timeout-func))
+  ;; (gnutls-transport-set-pull-timeout-function
+  ;;  (cffi:mem-ref session :pointer)
+  ;;  (cffi:get-callback 'pull-timeout-func))
 
   ;; TODO(kasper): add session restore
   
