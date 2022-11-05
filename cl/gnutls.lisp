@@ -97,7 +97,6 @@
 
 (defparameter session (cffi:foreign-alloc :pointer))
 (defparameter xcred (cffi:foreign-alloc :pointer))
-(defparameter priv (cffi:foreign-alloc :pointer))
 (defparameter *buf* (make-array 4096 :adjustable t :fill-pointer 0))
 
 (when (zerop (gnutls-check-version "3.4.6"))
@@ -107,6 +106,7 @@
                                     (buf :pointer)
                                     (size :size))
   (declare (ignorable transport-ptr))
+  (print "push-func called")
   (loop for index below size
         do (vector-push-extend (cffi:mem-ref buf :char index) *buf*))
   (format t "~% Done writing ~A bytes~%" size)
@@ -116,6 +116,7 @@
                                         (iov :pointer)
                                         (iovcnt :int))
   (declare (ignorable transport-ptr))
+  (print "vec-push-func called")
   (cffi:with-foreign-slots ((iov_base iov_len) iov (:struct giovec_t))
     (loop for index below iovcnt
           do (vector-push-extend (cffi:mem-ref iov_base :char index) *buf*))
@@ -126,6 +127,7 @@
                                     (buf :pointer)
                                     (size :size))
   (declare (ignorable transport-ptr))
+  (format t "pull-func called: ~A~%" transport-ptr)  
   (loop for index below size
         do (setf (cffi:mem-ref buf :char index)
                  (aref *buf* index)))
@@ -135,6 +137,7 @@
 (cffi:defcallback pull-timeout-func :int ((transport-ptr :pointer)
                                           (ms :uint))
   (declare (ignorable ms transport-ptr))
+  (print "pull-timeout-func called")
   (fill-pointer *buf*))
 
 (defun init-gnutls ()
@@ -153,7 +156,7 @@
 
   (gnutls-transport-set-ptr
    (cffi:mem-ref session :pointer)
-   priv)
+   (cffi:null-pointer))
   
   (gnutls-transport-set-push-function
    (cffi:mem-ref session :pointer)
