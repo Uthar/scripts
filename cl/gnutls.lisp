@@ -137,12 +137,9 @@
                                     (buf :pointer)
                                     (size :size))
   (declare (ignorable transport-ptr))
-  ;; (format t "pull-func called: ~A~%" transport-ptr)
-  ;; TODO(kasper): buffering
   (loop for index below size
         do (setf (cffi:mem-ref buf :unsigned-char index)
                  (read-byte *in*)))
-  (format t "~% Done reading ~A bytes~%" size)
   size)
 
 ;; (cffi:defcallback pull-timeout-func :int ((transport-ptr :pointer)
@@ -197,12 +194,12 @@
   ;; TODO(kasper): add session restore
   
   (loop for err = (gnutls-handshake (cffi:mem-ref session :pointer))
-        while (and (< err 0) (zerop (gnutls-version-is-fatal err)))
+        while (and (< err 0) (zerop (gnutls-error-is-fatal err)))
         finally (return err))
 
   (gnutls-record-send (cffi:mem-ref session :pointer)
                       "hello world"
-                      (length "hello world"))
+                      (length "hello world")))
 
 ;; GNUTLS_ENABLE_EARLY_START
 ;; gnutls_anty_replay_init
