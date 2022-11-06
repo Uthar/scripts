@@ -64,12 +64,12 @@
 (cffi:defcfun "gnutls_handshake" :int
   (session :pointer))
 
-(cffi:defcfun "gnutls_record_send" :size
+(cffi:defcfun "gnutls_record_send" :ssize
   (session :pointer)
   (data :pointer)
   (size :size))
 
-(cffi:defcfun "gnutls_record_recv" :size
+(cffi:defcfun "gnutls_record_recv" :ssize
   (session :pointer)
   (data :pointer)
   (size :size))
@@ -182,22 +182,26 @@
     (handshake (c:mem-ref session :pointer))
     (list :session (cffi:mem-ref session :pointer) :socket socket)))
 
-(defparameter sock (make-gnutls-socket "example.org" 443))
+(defun test ()
+  
+  (defparameter sock (make-gnutls-socket "example.org" 443))
 
-(socket:socket-close (getf sock :socket))
+  (socket:socket-close (getf sock :socket))
 
-(write-sequence (encode:string->octets (concatenate 'string
-                                                    "GET / HTTP/1.1"
-                                                    #(#\Return #\Newline)
-                                                    "Host: example.org"
-                                                    #(#\Return #\Newline)
-                                                    #(#\Return #\Newline)))
-                (make-instance 'gnutls-output-stream :socket sock))
+  (write-sequence (encode:string->octets (concatenate 'string
+                                                      "GET / HTTP/1.1"
+                                                      #(#\Return #\Newline)
+                                                      "Host: example.org"
+                                                      #(#\Return #\Newline)
+                                                      #(#\Return #\Newline)))
+                  (make-instance 'gnutls-output-stream :socket sock))
 
-(defparameter buf (make-array 1024 :element-type '(unsigned-byte 8)))
-(read-sequence buf (make-instance 'gnutls-input-stream :socket sock))
+  (defparameter buf (make-array 1024 :element-type '(unsigned-byte 8)))
+  (read-sequence buf (make-instance 'gnutls-input-stream :socket sock))
+  (encode:octets->string buf)
 
-(encode:octets->string buf)
+  )
+
 
 (defclass gnutls-input-stream (trivial-gray-streams:fundamental-binary-input-stream)
   ((%socket :initarg :socket :initform (error "socket required"))))
@@ -214,26 +218,35 @@
             (count (- (or end (length sequence)) start))
             (subseq (subseq sequence start)))
         (c:with-foreign-array (ptr subseq `(:array :uint8 ,count))
-          (gnutls-record-send session ptr count))))))
+          (let ((ret (gnutls-record-send session ptr count)))
+            (unless (zerop (gnutls-error-is-fatal ret))
+              (error 'end-of-file))))))))
 
-;; (defmethod trivial-gray-streams:stream-read-sequence
-;;     ((stream gnutls-input-stream) sequence start end &key)
-;;   (format t "reading bytes [~a;~a) into ~a~%" start end sequence)
-;;   (with-slots (%socket) stream
-;;     (destructuring-bind (&key session socket) %socket
-;;       (let* ((*in* (socket:make-socket-input-stream socket))
-;;              (*out* (socket:make-socket-output-stream socket))
-;;              (count (- (or end (length sequence)) start))
-;;              (ptr (c:foreign-alloc :uint8 :count count :initial-element 255)))
-;;         (unwind-protect
-;;              (loop initially (print (gnutls-record-recv session ptr count))
-;;                    for index below count
-;;                    for byte = (c:mem-aref ptr :uint8 index)
-;;                    do (progn
-;;                         (format t "writing byte ~a at index ~a~%" byte (+ start index))
-;;                         (setf (elt sequence (+ start index)) byte))
-;;                    finally (return count))
-;;           (c:foreign-free ptr))))))
+(defmethod trivial-gray-streams:stream-read-sequence
+    ((stream gnutls-input-stream) sequence start end &key)
+  (format t "reading bytes [~a;~a) into buf~%" start end )
+  (with-slots (%socket) stream
+    (destructuring-bind (&key session socket) %socket
+      (let* ((*in* (socket:make-socket-input-stream socket))
+             (*out* (socket:make-socket-output-stream socket))
+             (count (- (or end (length sequence)) start))
+             (ptr (c:foreign-alloc :uint8 :count count :initial-element 0)))
+        (unwind-protect
+             (loop for read = (print (gnutls-record-recv session ptr count))
+                   with position = 0
+                   while (< position count)
+                   do (if (or (zerop read) (not (zerop (gnutls-error-is-fatal read))))
+                          (error 'end-of-file)
+                          (progn
+                            (loop
+                            for index from 0 below (min read (- count position))
+                            for byte = (c:mem-aref ptr :uint8 (+ position index))
+                            do (progn
+                                 (format t "writing byte ~a at index ~a (read: ~a, start: ~a, position: ~a, index: ~a~%" byte (+ start position index) read start position index)
+                                 (setf (elt sequence (+ start position index)) byte)))
+                            (print (incf position (max 0 read)))))
+                   finally (return count))
+          (c:foreign-free ptr))))))
 
 ;; (defclass gnutls-input-stream
 ;;     (trivial-gray-streams:fundamental-binary-input-stream)
