@@ -196,9 +196,9 @@
                                                       #(#\Return #\Newline)))
                   (make-instance 'gnutls-output-stream :socket sock))
 
-  (defparameter buf (make-array 1024 :element-type '(unsigned-byte 8)))
+  (defparameter buf (make-array 2048 :element-type '(unsigned-byte 8)))
   (read-sequence buf (make-instance 'gnutls-input-stream :socket sock))
-  (encode:octets->string buf)
+  (alexandria:write-string-into-file (encode:octets->string buf) "test.html" :if-exists :supersede)
 
   )
 
