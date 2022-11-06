@@ -252,6 +252,9 @@
                    finally (return count))
           (c:foreign-free ptr))))))
 
+;; TODO(kasper): read-byte
+;; TODO(kasper): write-byte
+
 ;; (defclass gnutls-input-stream
 ;;     (trivial-gray-streams:fundamental-binary-input-stream)
 ;;   ((%session :initarg :session :initform (error "session required"))))
