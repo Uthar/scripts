@@ -201,7 +201,7 @@
   (alexandria:write-string-into-file (encode:octets->string buf) "test.html" :if-exists :supersede)
 
   )
-
+(code-char 112)
 
 (defclass gnutls-input-stream (trivial-gray-streams:fundamental-binary-input-stream)
   ((%socket :initarg :socket :initform (error "socket required"))))
@@ -240,11 +240,11 @@
                           (progn
                             (loop
                             for index from 0 below (min read (- count position))
-                            for byte = (c:mem-aref ptr :uint8 (+ position index))
+                            for byte = (c:mem-aref ptr :uint8 index)
                             do (progn
                                  (format t "writing byte ~a at index ~a (read: ~a, start: ~a, position: ~a, index: ~a~%" byte (+ start position index) read start position index)
                                  (setf (elt sequence (+ start position index)) byte)))
-                            (print (incf position (max 0 read)))))
+                            (print (incf position (max 0 (min read (- count position)))))))
                    finally (return count))
           (c:foreign-free ptr))))))
 
