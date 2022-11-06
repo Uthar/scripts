@@ -201,7 +201,7 @@
   (alexandria:write-string-into-file (encode:octets->string buf) "test.html" :if-exists :supersede)
 
   )
-(code-char 112)
+(code-char 13)
 
 (defclass gnutls-input-stream (trivial-gray-streams:fundamental-binary-input-stream)
   ((%socket :initarg :socket :initform (error "socket required"))))
@@ -218,6 +218,10 @@
             (count (- (or end (length sequence)) start))
             (subseq (subseq sequence start)))
         (c:with-foreign-array (ptr subseq `(:array :uint8 ,count))
+          ;; TODO(kasper):
+          ;; The number of bytes sent might be less than data_size.
+          ;; The maximum number of bytes this function can send in a single
+          ;; call depends on the negotiated maximum record size.
           (let ((ret (gnutls-record-send session ptr count)))
             (unless (zerop (gnutls-error-is-fatal ret))
               (error 'end-of-file))))))))
