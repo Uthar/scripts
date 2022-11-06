@@ -1,4 +1,15 @@
 
+(defpackage gnutls
+  (:use :cl)
+  (:local-nicknames
+   (:c :cffi))
+  (:export
+   :wrap-socket
+   :gnutls-record-send
+   :gnutls-record-recv))
+
+(in-package gnutls)
+
 (cffi:load-foreign-library "/nix/store/6535q25w085jn2lk23v651jhl6iln56s-gnutls-3.7.8/lib/libgnutls.so")
 
 (cffi:defcfun "gnutls_global_init" :int)
@@ -33,15 +44,19 @@
 (cffi:defcfun "gnutls_transport_set_ptr" :void
   (session :pointer)
   (ptr :pointer))
+
 (cffi:defcfun "gnutls_transport_set_push_function" :void
   (session :pointer)
   (func :pointer))
+
 (cffi:defcfun "gnutls_transport_set_vec_push_function" :void
   (session :pointer)
   (func :pointer))
+
 (cffi:defcfun "gnutls_transport_set_pull_function" :void
   (session :pointer)
   (func :pointer))
+
 (cffi:defcfun "gnutls_transport_set_pull_timeout_function" :void
   (session :pointer)
   (func :pointer))
@@ -61,11 +76,6 @@
 
 (cffi:defcfun "gnutls_error_is_fatal" :int
   (err :int))
-
-(cffi:defcfun "gnutls_record_send" :int
-  (session :pointer)
-  (msg :string)
-  (len :size))
 
 (cffi:defcstruct giovec_t
   (iov_base :pointer)
@@ -102,12 +112,6 @@
 
 ;;;;
 
-(defparameter session (cffi:foreign-alloc :pointer))
-(defparameter xcred (cffi:foreign-alloc :pointer))
-(defvar socket (socket:make-socket "127.0.0.1" 5555))
-(defvar *out* (socket:make-socket-output-stream socket))
-(defvar *in* (socket:make-socket-input-stream socket))
-
 (when (zerop (gnutls-check-version "3.6.5"))
   (warn "Unsupported GnuTLS version. Expect problems."))
 
@@ -115,28 +119,17 @@
                                     (buf :pointer)
                                     (size :size))
   (declare (ignorable transport-ptr))
+  (assert (not (null *out*)))
   (loop for index below size
         collect (cffi:mem-ref buf :unsigned-char index) into bytes
         finally (write-sequence bytes *out*))
   size)
 
-;; (cffi:defcallback vec-push-func :ssize ((transport-ptr :pointer)
-;;                                         (iov :pointer)
-;;                                         (iovcnt :int))
-;;   (declare (ignorable transport-ptr))
-;;   (print "vec-push-func called")
-;;   (cffi:with-foreign-slots ((iov_base iov_len) iov (:struct giovec_t))
-;;     ;; TODO(kasper): buffering
-;;     (loop for index below iovcnt
-;;           do (format t "write byte ~A~%" (cffi:mem-ref iov_base :unsigned-char index))          
-;;           do (write-byte (cffi:mem-ref iov_base :unsigned-char index) *out*))
-;;     ;; (format t "~% Done writing ~A bytes~%" iovcnt)
-;;     iovcnt))
-
 (cffi:defcallback pull-func :ssize ((transport-ptr :pointer)
                                     (buf :pointer)
                                     (size :size))
   (declare (ignorable transport-ptr))
+  (assert (not (null *in*)))
   (loop
     with bytes = (make-array size :element-type '(unsigned-byte 8))
     initially (read-sequence bytes *in*)
@@ -145,64 +138,182 @@
              (aref bytes index)))
   size)
 
-;; (cffi:defcallback pull-timeout-func :int ((transport-ptr :pointer)
-;;                                           (ms :uint))
-;;   (declare (ignorable ms transport-ptr))
-;;   (print "pull-timeout-func called")
-;;   ;; TODO(kasper): implement properly
-;;   32)
+(defvar *in* nil)
+(defvar *out* nil)
 
-(defun init-gnutls ()
+(defun handshake (session)
+  ;; TODO(kasper): do on first send instead
+  (loop for err = (gnutls-handshake session)
+        while (and (< err 0)
+                   (zerop (gnutls-error-is-fatal err)))))
 
-  (gnutls-global-init)
+(defun init-session ()
+  (let ((xcred (cffi:foreign-alloc :pointer))
+        (session (cffi:foreign-alloc :pointer)))
+    
+    (gnutls-certificate-allocate-credentials xcred)
+    (gnutls-certificate-set-x509-system-trust (cffi:mem-ref xcred :pointer))
+    
+    (gnutls-init session (logior +gnutls-client+))
+    (gnutls-set-default-priority (cffi:mem-ref session :pointer))
+    (gnutls-credentials-set (cffi:mem-ref session :pointer)
+                            +gnutls-crd-certificate+
+                            (cffi:mem-ref xcred :pointer))
+
+    (gnutls-transport-set-ptr
+     (cffi:mem-ref session :pointer)
+     (cffi:null-pointer))
   
-  (gnutls-certificate-allocate-credentials xcred)
+    (gnutls-transport-set-push-function
+     (cffi:mem-ref session :pointer)
+     (cffi:get-callback 'push-func))
 
-  ;; Or:
-  ;; gnutls_certificate_set_verify_flags(backend->cred,
-  ;; GNUTLS_VERIFY_ALLOW_X509_V1_CA_CRT)
-  ;;
-  ;; gnutls_certificate_set_x509_trust_file(backend->cred,
-  ;; SSL_CONN_CONFIG(CAfile),
-  ;; GNUTLS_X509_FMT_PEM)
+    (gnutls-transport-set-pull-function
+     (cffi:mem-ref session :pointer)
+     (cffi:get-callback 'pull-func))
+
+    session))
   
-  (gnutls-certificate-set-x509-system-trust (cffi:mem-ref xcred :pointer))
+(defun make-gnutls-socket (host port)
+  (let* ((session (init-session))
+         (socket (socket:make-socket host port))
+         (*in* (socket:make-socket-input-stream socket))
+         (*out* (socket:make-socket-output-stream socket)))
+    (handshake (c:mem-ref session :pointer))
+    (list :session (cffi:mem-ref session :pointer) :socket socket)))
+
+(defparameter sock (make-gnutls-socket "example.org" 443))
+
+(socket:socket-close (getf sock :socket))
+
+(write-sequence (encode:string->octets (concatenate 'string
+                                                    "GET / HTTP/1.1"
+                                                    #(#\Return #\Newline)
+                                                    "Host: example.org"
+                                                    #(#\Return #\Newline)
+                                                    #(#\Return #\Newline)))
+                (make-instance 'gnutls-output-stream :socket sock))
+
+(defparameter buf (make-array 1024 :element-type '(unsigned-byte 8)))
+(read-sequence buf (make-instance 'gnutls-input-stream :socket sock))
+
+(encode:octets->string buf)
+
+(defclass gnutls-input-stream (trivial-gray-streams:fundamental-binary-input-stream)
+  ((%socket :initarg :socket :initform (error "socket required"))))
+
+(defclass gnutls-output-stream (trivial-gray-streams:fundamental-binary-output-stream)
+  ((%socket :initarg :socket :initform (error "socket required"))))
+
+(defmethod trivial-gray-streams:stream-write-sequence
+    ((stream gnutls-output-stream) sequence start end &key)
+  (with-slots (%socket) stream
+    (destructuring-bind (&key session socket) %socket
+      (let ((*in* (socket:make-socket-input-stream socket))
+            (*out* (socket:make-socket-output-stream socket))
+            (count (- (or end (length sequence)) start))
+            (subseq (subseq sequence start)))
+        (c:with-foreign-array (ptr subseq `(:array :uint8 ,count))
+          (gnutls-record-send session ptr count))))))
+
+;; (defmethod trivial-gray-streams:stream-read-sequence
+;;     ((stream gnutls-input-stream) sequence start end &key)
+;;   (format t "reading bytes [~a;~a) into ~a~%" start end sequence)
+;;   (with-slots (%socket) stream
+;;     (destructuring-bind (&key session socket) %socket
+;;       (let* ((*in* (socket:make-socket-input-stream socket))
+;;              (*out* (socket:make-socket-output-stream socket))
+;;              (count (- (or end (length sequence)) start))
+;;              (ptr (c:foreign-alloc :uint8 :count count :initial-element 255)))
+;;         (unwind-protect
+;;              (loop initially (print (gnutls-record-recv session ptr count))
+;;                    for index below count
+;;                    for byte = (c:mem-aref ptr :uint8 index)
+;;                    do (progn
+;;                         (format t "writing byte ~a at index ~a~%" byte (+ start index))
+;;                         (setf (elt sequence (+ start index)) byte))
+;;                    finally (return count))
+;;           (c:foreign-free ptr))))))
+
+;; (defclass gnutls-input-stream
+;;     (trivial-gray-streams:fundamental-binary-input-stream)
+;;   ((%session :initarg :session :initform (error "session required"))))
+
+;; (defclass gnutls-output-stream
+;;     (trivial-gray-streams:fundamental-binary-output-stream)
+;;   ((%session :initarg :session :initform (error "session required"))))
+
+;; (defmethod trivial-gray-streams:stream-read-sequence
+;;     ((stream gnutls-input-stream) sequence start end &key)
+;;   (destructuring-bind (&key session socket)
+;;       (slot-value stream '%session)
+;;     (let ((*in* (socket:make-socket-input-stream socket))
+;;           (*out* (socket:make-socket-output-stream socket)))
+;;       (gnutls-record-send session
+;;                           (subseq sequence start)
+;;                           (- (or end (length sequence)) start)))))
+
+;; (defmethod trivial-gray-streams:stream-write-sequence
+;;     ((stream gnutls-output-stream) sequence start end &key)
+;;   (destructuring-bind (&key session socket)
+;;       (slot-value stream '%session)
+;;     (let ((*in* (socket:make-socket-input-stream socket))
+;;           (*out* (socket:make-socket-output-stream socket)))
+;;       (gnutls-record-send session
+;;                           (subseq sequence start)
+;;                           (- (or end (length sequence)) start)))))
+
+;; (defun init-gnutls ()
+
+;;   (gnutls-global-init)
   
-  (gnutls-init session (logior +gnutls-client+))
-  (gnutls-set-default-priority (cffi:mem-ref session :pointer))
-  (gnutls-credentials-set (cffi:mem-ref session :pointer)
-                          +gnutls-crd-certificate+
-                          (cffi:mem-ref xcred :pointer))
+;;   (gnutls-certificate-allocate-credentials xcred)
 
-  (gnutls-transport-set-ptr
-   (cffi:mem-ref session :pointer)
-   (cffi:null-pointer))
+;;   ;; Or:
+;;   ;; gnutls_certificate_set_verify_flags(backend->cred,
+;;   ;; GNUTLS_VERIFY_ALLOW_X509_V1_CA_CRT)
+;;   ;;
+;;   ;; gnutls_certificate_set_x509_trust_file(backend->cred,
+;;   ;; SSL_CONN_CONFIG(CAfile),
+;;   ;; GNUTLS_X509_FMT_PEM)
   
-  (gnutls-transport-set-push-function
-   (cffi:mem-ref session :pointer)
-   (cffi:get-callback 'push-func))
-
-  ;; (gnutls-transport-set-vec-push-function
-  ;;  (cffi:mem-ref session :pointer)
-  ;;  (cffi:get-callback 'vec-push-func))
-
-  (gnutls-transport-set-pull-function
-   (cffi:mem-ref session :pointer)
-   (cffi:get-callback 'pull-func))
-
-  ;; (gnutls-transport-set-pull-timeout-function
-  ;;  (cffi:mem-ref session :pointer)
-  ;;  (cffi:get-callback 'pull-timeout-func))
-
-  ;; TODO(kasper): add session restore
+;;   (gnutls-certificate-set-x509-system-trust (cffi:mem-ref xcred :pointer))
   
-  (loop for err = (gnutls-handshake (cffi:mem-ref session :pointer))
-        while (and (< err 0) (zerop (gnutls-error-is-fatal err)))
-        finally (return err))
+;;   (gnutls-init session (logior +gnutls-client+))
+;;   (gnutls-set-default-priority (cffi:mem-ref session :pointer))
+;;   (gnutls-credentials-set (cffi:mem-ref session :pointer)
+;;                           +gnutls-crd-certificate+
+;;                           (cffi:mem-ref xcred :pointer))
 
-  (gnutls-record-send (cffi:mem-ref session :pointer)
-                      "hello world"
-                      (length "hello world")))
+;;   (gnutls-transport-set-ptr
+;;    (cffi:mem-ref session :pointer)
+;;    (cffi:null-pointer))
+  
+;;   (gnutls-transport-set-push-function
+;;    (cffi:mem-ref session :pointer)
+;;    (cffi:get-callback 'push-func))
+
+;;   ;; (gnutls-transport-set-vec-push-function
+;;   ;;  (cffi:mem-ref session :pointer)
+;;   ;;  (cffi:get-callback 'vec-push-func))
+
+;;   (gnutls-transport-set-pull-function
+;;    (cffi:mem-ref session :pointer)
+;;    (cffi:get-callback 'pull-func))
+
+;;   ;; (gnutls-transport-set-pull-timeout-function
+;;   ;;  (cffi:mem-ref session :pointer)
+;;   ;;  (cffi:get-callback 'pull-timeout-func))
+
+;;   ;; TODO(kasper): add session restore
+  
+;;   (loop for err = (gnutls-handshake (cffi:mem-ref session :pointer))
+;;         while (and (< err 0) (zerop (gnutls-error-is-fatal err)))
+;;         finally (return err))
+
+;;   (gnutls-record-send (cffi:mem-ref session :pointer)
+;;                       "hello world"
+;;                       (length "hello world")))
 
 ;; GNUTLS_ENABLE_EARLY_START
 ;; gnutls_anty_replay_init

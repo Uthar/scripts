@@ -45,7 +45,7 @@
                                  :protocol :tcp)))
       (sb-bsd-sockets:socket-connect
        socket
-       (sb-bsd-sockets:make-inet-address host)
+       (sb-bsd-sockets:host-ent-address (sb-bsd-sockets:get-host-by-name host))
        port)
       socket)))
 
@@ -120,7 +120,7 @@
                                       :output t
                                       :element-type '(unsigned-byte 8)
                                       :buffering :none
-                                      :auto-close t)))
+                                      :auto-close nil)))
                 
 (defun make-socket-output-stream (socket)
   (make-instance
@@ -139,7 +139,7 @@
                                       :output t
                                       :element-type '(unsigned-byte 8)
                                       :buffering :none
-                                      :auto-close t)))
+                                      :auto-close nil)))
 
 (defclass socket-stream (gray:fundamental-binary-stream)
   ((socket :initarg :socket :initform (error "socket required"))
