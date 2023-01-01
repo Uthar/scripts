@@ -110,21 +110,33 @@
 (defparameter |GenericEvent|  35)
 (defparameter |LASTEvent|  36)
 
+;; Open the display
 (defparameter display (xopendisplay ":0"))
 (defparameter screen (xdefaultscreenofdisplay display))
-(defparameter root-window (xrootwindowofscreen screen))
+
+;; Open the window
 (defparameter window
-  (xcreatesimplewindow display root-window 100 100 100 100 0 0 0))
+  (xcreatesimplewindow display
+                       (xrootwindowofscreen screen)
+                       100 100
+                       800 600
+                       1 0 0))
+
 (xselectinput display window (logior |KeyPressMask|
-                                     |KeyReleaseMask|
-                                     ;; |StructureNotifyMask|
-                                     ))
+                                     |KeyReleaseMask|))
+
+;; Show the window
 (xclearwindow display window)
 (xmapraised display window)
+
+;; Enter message loop
 (defparameter xev (cffi:foreign-alloc :pointer))
 (xnextevent display xev)
+
 ;; Event type
 (cffi:mem-ref xev :int)
+
+;; Cleanup
 (xdestroywindow display window)
 (xfree screen)
 (xclosedisplay display)
