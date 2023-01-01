@@ -1,32 +1,3 @@
-(in-package yrmadis)
-
-(defun julianday ()
-  (+ (/ (unixepoch) 86400.0d0) 2440587.5d0))
-
-#+unix
-(cffi:defcstruct timeval
-  (sec :uint64)
-  (usec :uint64))
-
-#+unix
-(defun unixepoch ()
-  (cffi:with-foreign-object (tv '(:struct timeval))
-    (cffi:foreign-funcall "gettimeofday"
-                          (:pointer (:struct timeval)) tv
-                          :pointer (cffi:null-pointer)
-                          :int)
-    (cffi:with-foreign-slots ((sec usec) tv (:struct timeval))
-      (+ sec (/ usec 1000000.0d0)))))
-
-#+win32
-(defun unixepoch ()
-  (error "Not implemented yet"))
-
-#-(or win32 unix)
-(defun unixepoch ()
-  (error "Not implemented"))
-
-
 (cffi:load-foreign-library "/nix/store/9mg4w9gk1bl4xx90painmfx47vn9acpl-libX11-1.7.2/lib/libX11.so")
 
 (cffi:defcfun "XOpenDisplay" :pointer
@@ -103,17 +74,58 @@
 (defparameter |ColormapChangeMask|  (ash 1 23))
 (defparameter |OwnerGrabButtonMask|  (ash 1 24))
 
+(defparameter |KeyPress|  2)
+(defparameter |KeyRelease|  3)
+(defparameter |ButtonPress|  4)
+(defparameter |ButtonRelease|  5)
+(defparameter |MotionNotify|  6)
+(defparameter |EnterNotify|  7)
+(defparameter |LeaveNotify|  8)
+(defparameter |FocusIn|   9)
+(defparameter |FocusOut|  10)
+(defparameter |KeymapNotify|  11)
+(defparameter |Expose|   12)
+(defparameter |GraphicsExpose|  13)
+(defparameter |NoExpose|  14)
+(defparameter |VisibilityNotify| 15)
+(defparameter |CreateNotify|  16)
+(defparameter |DestroyNotify|  17)
+(defparameter |UnmapNotify|  18)
+(defparameter |MapNotify|  19)
+(defparameter |MapRequest|  20)
+(defparameter |ReparentNotify|  21)
+(defparameter |ConfigureNotify|  22)
+(defparameter |ConfigureRequest| 23)
+(defparameter |GravityNotify|  24)
+(defparameter |ResizeRequest|  25)
+(defparameter |CirculateNotify|  26)
+(defparameter |CirculateRequest| 27)
+(defparameter |PropertyNotify|  28)
+(defparameter |SelectionClear|  29)
+(defparameter |SelectionRequest| 30)
+(defparameter |SelectionNotify|  31)
+(defparameter |ColormapNotify|  32)
+(defparameter |ClientMessage|  33)
+(defparameter |MappingNotify|  34)
+(defparameter |GenericEvent|  35)
+(defparameter |LASTEvent|  36)
+
 (defparameter display (xopendisplay ":0"))
 (defparameter screen (xdefaultscreenofdisplay display))
 (defparameter root-window (xrootwindowofscreen screen))
-(defparameter window (xcreatesimplewindow display root-window 100 100 100 100 0 0 0))
+(defparameter window
+  (xcreatesimplewindow display root-window 100 100 100 100 0 0 0))
 (xselectinput display window (logior |KeyPressMask|
-                                     |StructureNotifyMask|
-                                     |NoEventMask|))
+                                     |KeyReleaseMask|
+                                     ;; |StructureNotifyMask|
+                                     ))
 (xclearwindow display window)
 (xmapraised display window)
 (defparameter xev (cffi:foreign-alloc :pointer))
 (xnextevent display xev)
+;; Event type
+(cffi:mem-ref xev :int)
 (xdestroywindow display window)
 (xfree screen)
 (xclosedisplay display)
+
