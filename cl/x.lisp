@@ -151,3 +151,15 @@
 (xfree screen)
 (xclosedisplay display)
 
+;; (defparameter display (xlib:open-default-display))
+;; (defparameter screen (xlib:display-default-screen display))
+;; (defparameter window (xlib:create-window
+;;                       :parent (xlib:screen-root screen)
+;;                       :x 10 :y 10
+;;                       :width 800 :height 600
+;;                       :event-mask '(:exposure :key-press)))
+
+;; (xlib:map-window window)
+
+;; (xlib:process-event display :handler (lambda (&rest args)
+;;                                        (format t "~{~A~%~}~%" args)))
