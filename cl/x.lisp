@@ -110,6 +110,16 @@
 (defparameter |GenericEvent|  35)
 (defparameter |LASTEvent|  36)
 
+(cffi:defcfun "XInitThreads" :int)
+
+;; (XInitThreads)
+
+(cffi:defcfun "XLockDisplay" :void
+  (display :pointer))
+
+(cffi:defcfun "XUnlockDisplay" :void
+  (display :pointer))
+
 (cffi:defcfun "XSetErrorHandler" :pointer
   (handler :pointer))
 
@@ -122,6 +132,8 @@
 
 ;; Open the display
 (defparameter display (xopendisplay ":0"))
+;; (XLockDisplay display)
+
 (defparameter screen (xdefaultscreenofdisplay display))
 
 ;; Open the window
