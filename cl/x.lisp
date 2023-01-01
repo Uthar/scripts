@@ -110,6 +110,16 @@
 (defparameter |GenericEvent|  35)
 (defparameter |LASTEvent|  36)
 
+(cffi:defcfun "XSetErrorHandler" :pointer
+  (handler :pointer))
+
+(cffi:defcallback my-error-handler :int
+    ((display :pointer)
+     (x-error-event :pointer))
+  (format t "X error~%"))
+
+(xseterrorhandler (cffi:callback my-error-handler))
+
 ;; Open the display
 (defparameter display (xopendisplay ":0"))
 (defparameter screen (xdefaultscreenofdisplay display))
