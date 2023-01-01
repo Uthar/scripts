@@ -141,10 +141,11 @@
 
 ;; Enter message loop
 (defparameter xev (cffi:foreign-alloc :pointer))
-(xnextevent display xev)
 
-;; Event type
-(cffi:mem-ref xev :int)
+;; Must be run from the same thread as everything else.
+(loop
+  (xnextevent display xev)
+  (print (cffi:mem-ref xev :int)))
 
 ;; Cleanup
 (xdestroywindow display window)
