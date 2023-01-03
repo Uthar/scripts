@@ -1,3 +1,10 @@
+;; For --script (that's the only way it works. Maybe because then it's in the
+;; main thread
+;;
+;; (require 'asdf)
+;;
+;; (asdf:load-system 'cffi)
+
 (cffi:load-foreign-library "/nix/store/9mg4w9gk1bl4xx90painmfx47vn9acpl-libX11-1.7.2/lib/libX11.so")
 
 (cffi:defcfun "XOpenDisplay" :pointer
@@ -112,6 +119,7 @@
 
 (cffi:defcfun "XInitThreads" :int)
 
+;; Doesn't work with this in Lisp, but works in C
 ;; (XInitThreads)
 
 (cffi:defcfun "XLockDisplay" :void
