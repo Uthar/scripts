@@ -120,7 +120,7 @@
 (cffi:defcfun "XInitThreads" :int)
 
 ;; Doesn't work with this in Lisp, but works in C
-;; (XInitThreads)
+(XInitThreads)
 
 (cffi:defcfun "XLockDisplay" :void
   (display :pointer))
@@ -150,7 +150,7 @@
                        (xrootwindowofscreen screen)
                        100 100
                        800 600
-                       1 0 0))
+                       0 0 0))
 
 (xselectinput display window (logior |KeyPressMask|
                                      |KeyReleaseMask|))
