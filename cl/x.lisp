@@ -60,4 +60,4 @@
 
 (dotimes (_ 100)
   (XNextEvent d e)
-  (format t "~a~%" (c:deref e 0)))
+  (format t "~a~%" (logand #xffff (c:deref e 0))))
