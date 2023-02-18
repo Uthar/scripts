@@ -802,11 +802,10 @@
 (c:defcstruct keysym
   (scancode scancode)
   (keycode keycode)
-  (mod :uint16)
-  (unused :uint32))
+  (mod :uint16))
 
 (c:defcstruct keyboard-event
-  (type :uint32)
+  (type event)
   (timestamp :uint32)
   (window-id :uint32)
   (state :uint8)
