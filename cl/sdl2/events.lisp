@@ -8,7 +8,7 @@
 
 (c:defcenum event-type
   ;; application events
-  (:quit #0x100)
+  (:quit #x100)
   :app-terminating
   :app-lowmemory
   :app-willenterbackground 
@@ -17,14 +17,14 @@
   :localechanged
 
   ;; display events
-  (:displayevent #0x150)
+  (:displayevent #x150)
 
   ;; window events
-  (:windowevent     #0x200)
+  (:windowevent     #x200)
   :syswmevent             
 
   ;; keyboard events
-  (:keydown         #0x300)
+  (:keydown         #x300)
   :keyup                  
   :textediting            
   :textinput              
@@ -32,13 +32,13 @@
   :textediting-ext       
 
   ;; mouse events
-  (:mousemotion     #0x400)
+  (:mousemotion     #x400)
   :mousebuttondown        
   :mousebuttonup          
   :mousewheel             
 
   ;; joystick events
-  (:joyaxismotion   #0x600)
+  (:joyaxismotion   #x600)
   :joyballmotion          
   :joyhatmotion           
   :joybuttondown          
@@ -48,7 +48,7 @@
   :joybatteryupdated      
 
   ;; game controller events
-  (:controlleraxismotion   #0x650)
+  (:controlleraxismotion   #x650)
   :controllerbuttondown          
   :controllerbuttonup            
   :controllerdeviceadded         
@@ -60,40 +60,40 @@
   :controllersensorupdate        
 
   ;; touch events
-  (:fingerdown       #0x70)
+  (:fingerdown       #x70)
   :fingerup
   :fingermotion
 
   ;; gesture events
-  (:dollargesture    #0x80)
+  (:dollargesture    #x80)
   :dollarrecord
   :multigesture
 
   ;; clipboard events
-  (:clipboardupdate  #0x900)
+  (:clipboardupdate  #x900)
 
   ;; drag and drop events
-  (:dropfile         #0x1000)
+  (:dropfile         #x1000)
   :droptext                 
   :dropbegin                
   :dropcomplete             
 
   ;; audio hotplug events
-  (:audiodeviceadded  #0x1100)
+  (:audiodeviceadded  #x1100)
   :audiodeviceremoved        
 
   ;; sensor events
-  (:sensorupdate  #0x1200)
+  (:sensorupdate  #x1200)
 
   ;; render events
-  (:render-targets-reset  #0x2000)
+  (:render-targets-reset  #x2000)
   :render-device-reset 
 
   ;; internal events
-  (:pollsentinel  #0x7f00)
+  (:pollsentinel  #x7f00)
 
-  (:userevent     #0x800)
-  (:lastevent     #0xff))
+  (:userevent     #x800)
+  (:lastevent     #xff))
 
 (c:defcstruct common-event
   (type event-type)

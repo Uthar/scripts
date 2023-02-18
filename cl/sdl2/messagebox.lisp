@@ -6,16 +6,16 @@
 (in-package sdl2/messagebox)
 
 (c:defcenum flags
-  (:error #0x10)
-  (:warning #0x20)
-  (:information #0x40)
-  ;; (:buttons-left-to-right #0x80)
-  ;; (:buttons-right-to-left #0x100)
+  (:error #x10)
+  (:warning #x20)
+  (:information #x40)
+  ;; (:buttons-left-to-right #x80)
+  ;; (:buttons-right-to-left #x100)
   )
 
 ;; (c:defcenum button-flags
-;;   (:button-returnkey-default #0x1)
-;;   (:button-escapekey-default #0x2))
+;;   (:button-returnkey-default #x1)
+;;   (:button-escapekey-default #x2))
 
 ;; (c:defcstruct button-data
 ;;   (flags button-flags)

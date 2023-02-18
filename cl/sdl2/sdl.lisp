@@ -6,24 +6,24 @@
 (in-package sdl2/sdl)
 
 (c:defbitfield init-flags
-  (:timer          #0x00000001)
-  (:audio          #0x00000010)
-  (:video          #0x00000020)
-  (:joystick       #0x00000200)
-  (:haptic         #0x00001000)
-  (:gamecontroller #0x00002000)
-  (:events         #0x00004000)
-  (:sensor         #0x00008000)
+  (:timer          #x00000001)
+  (:audio          #x00000010)
+  (:video          #x00000020)
+  (:joystick       #x00000200)
+  (:haptic         #x00001000)
+  (:gamecontroller #x00002000)
+  (:events         #x00004000)
+  (:sensor         #x00008000)
   #|
   (logior
-   #0x00000001
-   #0x00000010
-   #0x00000020
-   #0x00000200
-   #0x00001000
-   #0x00002000
-   #0x00004000
-   #0x00008000)
+   #x00000001
+   #x00000010
+   #x00000020
+   #x00000200
+   #x00001000
+   #x00002000
+   #x00004000
+   #x00008000)
   |#
   (:everything 62001))
 
