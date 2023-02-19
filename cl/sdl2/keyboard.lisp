@@ -3,7 +3,9 @@
   (:import-from :sdl2/scancode :scancode)
   (:import-from :sdl2/keycode :keycode)
   (:local-nicknames
-   (:c :cffi)))
+   (:c :cffi))
+  (:export
+   #:keysym))
 
 (in-package sdl2/keyboard)
 

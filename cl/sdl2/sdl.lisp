@@ -1,7 +1,12 @@
 (defpackage sdl2/sdl
   (:use :cl)
   (:local-nicknames
-   (:c :cffi)))
+   (:c :cffi))
+  (:export
+   #:init
+   #:quit-sub-system
+   #:was-init
+   #:quit))
 
 (in-package sdl2/sdl)
 

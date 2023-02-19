@@ -2,7 +2,17 @@
   (:use :cl)
   (:import-from :sdl2/keyboard :keysym)
   (:local-nicknames
-   (:c :cffi)))
+   (:c :cffi))
+  (:export
+   #:common-event
+   #:display-event
+   #:window-event
+   #:keyboard-event
+   #:mouse-motion-event
+   #:mouse-button-event
+   #:mouse-wheel-event
+   #:make-event
+   #:poll-event))
 
 (in-package sdl2/events)
 

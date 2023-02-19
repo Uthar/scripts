@@ -1,7 +1,9 @@
 (defpackage sdl2/messagebox
   (:use :cl)
   (:local-nicknames
-   (:c :cffi)))
+   (:c :cffi))
+  (:export
+   :show-simple-message-box))
 
 (in-package sdl2/messagebox)
 

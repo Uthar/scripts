@@ -1,7 +1,14 @@
 (defpackage sdl2/video
   (:use :cl)
   (:local-nicknames
-   (:c :cffi)))
+   (:c :cffi))
+  (:export
+   #:get-num-video-displays
+   #:get-display-name
+   #:create-window
+   #:destroy-window
+   #:gl-create-context
+   #:gl-swap-window))
 
 (in-package sdl2/video)
 
