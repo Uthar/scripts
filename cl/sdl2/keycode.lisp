@@ -6,10 +6,11 @@
 
 (in-package sdl2/keycode)
 
-(defparameter +scancode-mask+ (ash 1 30))
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defparameter +scancode-mask+ (ash 1 30))
 
-(defun scancode->keycode (x)
-  (logior x +scancode-mask+))
+  (defun scancode->keycode (x)
+    (logior x +scancode-mask+)))
 
 (c:defcenum keycode
   (:unknown 0)
