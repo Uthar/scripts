@@ -40,7 +40,15 @@
   (for ((x (list 1 2 3))
         (y (vector 4 5 6))
         ((k . v) things))
-    (print (list x y k v))))
+    (print (list x y k v)))
+
+  ;; vs
+
+  (loop :for x :in (list 1 2 3)
+        :for y :across (vector 4 5 6)
+        :for k :being :the :hash-keys :of things :using (hash-value v)
+    :do (print (list x y k v)))
+  )
 
 (defclass iterator () ())
 
