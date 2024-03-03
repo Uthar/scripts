@@ -213,3 +213,38 @@
     (for (((k v) h))
          (format t "~A -> ~A~%" k v)))
   )
+
+
+;; Experimental stuff
+
+(comment
+  (defmacro %for2 ((&rest bindings) &body body)
+    (let ((bindings (mapcar (lambda (b) (list* (gensym "ITER") (gensym "VAR") b)) bindings)))
+      `(let ,(mapcar (lambda (binding)
+                       (destructuring-bind (giter gvar bind thing) binding
+                         (declare (ignore var))
+                         `(,giter (iterator ,thing))))
+              bindings)
+         (handler-case
+             (do ,(mapcar (lambda (binding)
+                            (destructuring-bind (giter gvar bind thing) binding
+                              (declare (ignore var))
+                              `(,gvar (next ,giter) (next ,giter))))
+                          bindings)
+                 (nil (values))
+               ,(reduce (lambda (r b)
+                          (destructuring-bind (giter gvar bind thing) b
+                            (cond
+                              ((and (consp bind) (eq 'values (car bind)))
+                               `(multiple-value-bind ,(cdr bind) ,gvar ,r))
+                              ((consp bind)
+                               `(destructuring-bind ,bind ,gvar ,r))
+                              ((symbolp bind)
+                               `(let ((,bind ,gvar)) ,r))
+                              (t (error "Unsupported binding")))))
+                        bindings
+                        :initial-value `(progn ,@body)))
+           (end (e)
+             (declare (ignore e))
+             (values))))))
+  )
