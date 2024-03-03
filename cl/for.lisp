@@ -83,6 +83,8 @@
   (:default-initargs
    :hash-table (make-hash-table)))
 
+;; TODO think about how to make hash table iterator non consing
+
 (defmethod initialize-instance :after
   ((iterator hash-table-iterator) &key hash-table)
   (setf (slot-value iterator 'wrapped)
