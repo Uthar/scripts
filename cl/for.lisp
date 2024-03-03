@@ -7,22 +7,21 @@
 
 (defmacro for ((&rest bindings) &body body)
   (let ((bindings (mapcar (lambda (b) (list* (gensym "ITER") b)) bindings)))
-  `(loop ,@(mapcan (lambda (binding)
-                    (destructuring-bind (gsym var thing) binding
-                      (declare (ignore var))
-                      `(:with ,gsym := (iterator ,thing))))
-                   bindings)
-         ,@(mapcan (lambda (binding)
-                     (destructuring-bind (gsym var thing) binding
-                       (declare (ignore thing))
-                       `(:for ,var := (next ,gsym))))
-                   bindings)
-         ,@(mapcan (lambda (binding)
-                     (destructuring-bind (gsym var thing) binding
-                       (declare (ignore gsym thing))
-                       `(:while (not (eq ,var +end+)))))
-                   bindings)
-         :do (progn ,@body))))
+    `(handler-case
+         (loop ,@(mapcan (lambda (binding)
+                           (destructuring-bind (gsym var thing) binding
+                             (declare (ignore var))
+                             `(:with ,gsym := (iterator ,thing))))
+                         bindings)
+               ,@(mapcan (lambda (binding)
+                           (destructuring-bind (gsym var thing) binding
+                             (declare (ignore thing))
+                             `(:for ,var := (next ,gsym))))
+                         bindings)
+               :do (progn ,@body))
+       (end (e)
+         (declare (ignore e))
+         (values)))))
 
 (defun iterator (thing)
   (etypecase thing
@@ -36,9 +35,9 @@
 (setf (gethash "z" things) 44)
 
 (for ((x (list 1 2 3))
-      (y (vector 4 5))
-      (z things))
-  (print (list x y z)))
+      (y (vector 4 5 6))
+      ((k . v) things))
+  (print (list x y k v)))
 
 (defclass iterator () ())
 
@@ -47,9 +46,15 @@
 (defgeneric more-p (iterator))
 
 (defmethod next :around ((iterator iterator))
-  (if (more-p iterator)
-      (call-next-method)
-      +end+))
+  (unless (more-p iterator)
+    (error 'end))
+  (call-next-method))
+
+(define-condition end (error) ()
+  (:report 
+   (lambda (e stream)
+     (declare (ignore e))
+     (format stream "Iterator reached the end."))))
 
 (defclass end () ())
 (defparameter +end+ (make-instance 'end))
@@ -121,32 +126,33 @@
     (setf (slot-value iterator 'last-value) (if exists value +end+))
     exists))
 
-(let ((iter (make-instance 'list-iterator :list '(1 2 3))))
-  (print (next iter))
-  (print (next iter))
-  (print (next iter))
-  (print (next iter))
-  (print (next iter)))
+(comment
+  (let ((iter (make-instance 'list-iterator :list '(1 2 3))))
+    (print (next iter))
+    (print (next iter))
+    (print (next iter))
+    (print (next iter))
+    (print (next iter)))
 
-(let ((iter (make-instance 'vector-iterator :vector #(1 2 3))))
-  (print (next iter))
-  (print (next iter))
-  (print (next iter))
-  (print (next iter))
-  (print (next iter)))
+  (let ((iter (make-instance 'vector-iterator :vector #(1 2 3))))
+    (print (next iter))
+    (print (next iter))
+    (print (next iter))
+    (print (next iter))
+    (print (next iter)))
 
-(let* ((ht (make-hash-table :test 'equal))
-       (_ (setf (gethash "x" ht) 42
-                (gethash "y" ht) 43
-                (gethash "z" ht) 44))
-       ;; (_ (print (hash-table-count ht)))
-       (iter (make-instance 'hash-table-iterator :hash-table ht)))
-  (print (next iter))
-  (print (next iter))
-  (print (next iter))
-  (print (next iter))
-  (print (next iter))
-  (print (next iter)))
+  (let* ((ht (make-hash-table :test 'equal))
+         (_ (setf (gethash "x" ht) 42
+                  (gethash "y" ht) 43
+                  (gethash "z" ht) 44))
+         ;; (_ (print (hash-table-count ht)))
+         (iter (make-instance 'hash-table-iterator :hash-table ht)))
+    (print (next iter))
+    (print (next iter))
+    (print (next iter))
+    (print (next iter))
+    (print (next iter))
+    (print (next iter))))
 
 (defmacro comment (&body body)
   (declare (ignore body))
