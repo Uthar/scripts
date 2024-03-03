@@ -3,6 +3,8 @@
 
 (in-package for)
 
+;; TODO: Add an iterator that works on all (and SBCL's extensible) sequences
+
 (export 'for)
 
 (defmacro for ((&rest bindings) &body body)
@@ -29,15 +31,16 @@
     (vector (make-instance 'vector-iterator :vector thing))
     (hash-table (make-instance 'hash-table-iterator :hash-table thing))))
 
-(defparameter things (make-hash-table :test 'equal))
-(setf (gethash "x" things) 42)
-(setf (gethash "y" things) 43)
-(setf (gethash "z" things) 44)
+(comment
+  (defparameter things (make-hash-table :test 'equal))
+  (setf (gethash "x" things) 42)
+  (setf (gethash "y" things) 43)
+  (setf (gethash "z" things) 44)
 
-(for ((x (list 1 2 3))
-      (y (vector 4 5 6))
-      ((k . v) things))
-  (print (list x y k v)))
+  (for ((x (list 1 2 3))
+        (y (vector 4 5 6))
+        ((k . v) things))
+    (print (list x y k v))))
 
 (defclass iterator () ())
 
@@ -55,9 +58,6 @@
    (lambda (e stream)
      (declare (ignore e))
      (format stream "Iterator reached the end."))))
-
-(defclass end () ())
-(defparameter +end+ (make-instance 'end))
 
 (defclass list-iterator (iterator)
   ((list :initarg :list :initform nil :type list)))
@@ -115,7 +115,7 @@
   ((function :initarg :function :type function)
    (last-value :type t))
   (:default-initargs
-   :function (lambda () (cons +end+ nil))))
+   :function (lambda () (cons nil nil))))
 
 (defmethod next ((iterator funcall-iterator))
   (slot-value iterator 'last-value))
@@ -123,7 +123,7 @@
 (defmethod more-p ((iterator funcall-iterator))
   (destructuring-bind (value . exists)
       (funcall (slot-value iterator 'function))
-    (setf (slot-value iterator 'last-value) (if exists value +end+))
+    (setf (slot-value iterator 'last-value) value)
     exists))
 
 (comment
