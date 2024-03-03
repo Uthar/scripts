@@ -6,10 +6,39 @@
 (export 'for)
 
 (defmacro for ((&rest bindings) &body body)
-  `(loop ,@(mapcar (lambda (binding)
-                     (destructuring-bind (sym thing) binding
-                       ())))))
+  (let ((bindings (mapcar (lambda (b) (list* (gensym "ITER") b)) bindings)))
+  `(loop ,@(mapcan (lambda (binding)
+                    (destructuring-bind (gsym var thing) binding
+                      (declare (ignore var))
+                      `(:with ,gsym := (iterator ,thing))))
+                   bindings)
+         ,@(mapcan (lambda (binding)
+                     (destructuring-bind (gsym var thing) binding
+                       (declare (ignore thing))
+                       `(:for ,var := (next ,gsym))))
+                   bindings)
+         ,@(mapcan (lambda (binding)
+                     (destructuring-bind (gsym var thing) binding
+                       (declare (ignore gsym thing))
+                       `(:while (not (eq ,var +end+)))))
+                   bindings)
+         :do (progn ,@body))))
 
+(defun iterator (thing)
+  (etypecase thing
+    (cons (make-instance 'list-iterator :list thing))
+    (vector (make-instance 'vector-iterator :vector thing))
+    (hash-table (make-instance 'hash-table-iterator :hash-table thing))))
+
+(defparameter things (make-hash-table :test 'equal))
+(setf (gethash "x" things) 42)
+(setf (gethash "y" things) 43)
+(setf (gethash "z" things) 44)
+
+(for ((x (list 1 2 3))
+      (y (vector 4 5))
+      (z things))
+  (print (list x y z)))
 
 (defclass iterator () ())
 
@@ -49,26 +78,46 @@
   (with-slots (vector index) iterator
     (< index (length vector))))
 
-(defclass hash-table-iterator (iterator)
-  ((hash-table :initarg :hash-table :type hash-table)
-   (hash-table-iterator :type (integer 0)))
+(defclass hash-table-iterator (wrapped-iterator)
+  ((hash-table :initarg :hash-table :type hash-table))
   (:default-initargs
    :hash-table (make-hash-table)))
 
-(defmethod initialize-instance :after ((iterator hash-table-iterator) &key hash-table)
-  (print hash-table))
+(defmethod initialize-instance :after
+  ((iterator hash-table-iterator) &key hash-table)
+  (setf (slot-value iterator 'wrapped)
+        (make-instance 'funcall-iterator 
+          :function
+          (with-hash-table-iterator (ht-iterator hash-table)
+            (lambda ()
+              (multiple-value-bind (exists key value) (ht-iterator)
+                (cons (cons key value) exists)))))))
 
-(make-instance 'hash-table-iterator)
-  
+(defclass wrapped-iterator ()
+  ((wrapped :initarg :wrapped :type iterator))
+  (:default-initargs
+   :wrapped (make-instance 'list-iterator)))
 
-(defmethod next ((iterator vector-iterator))
-  (with-slots (vector index) iterator
-    (prog1 (aref vector index)
-      (incf index))))
+(defmethod more-p ((iterator wrapped-iterator))
+  (more-p (slot-value iterator 'wrapped)))
 
-(defmethod more-p ((iterator vector-iterator))
-  (with-slots (vector index) iterator
-    (< index (length vector))))
+(defmethod next ((iterator wrapped-iterator))
+  (next (slot-value iterator 'wrapped)))
+
+(defclass funcall-iterator (iterator)
+  ((function :initarg :function :type function)
+   (last-value :type t))
+  (:default-initargs
+   :function (lambda () (cons +end+ nil))))
+
+(defmethod next ((iterator funcall-iterator))
+  (slot-value iterator 'last-value))
+
+(defmethod more-p ((iterator funcall-iterator))
+  (destructuring-bind (value . exists)
+      (funcall (slot-value iterator 'function))
+    (setf (slot-value iterator 'last-value) (if exists value +end+))
+    exists))
 
 (let ((iter (make-instance 'list-iterator :list '(1 2 3))))
   (print (next iter))
@@ -84,57 +133,75 @@
   (print (next iter))
   (print (next iter)))
 
+(let* ((ht (make-hash-table :test 'equal))
+       (_ (setf (gethash "x" ht) 42
+                (gethash "y" ht) 43
+                (gethash "z" ht) 44))
+       ;; (_ (print (hash-table-count ht)))
+       (iter (make-instance 'hash-table-iterator :hash-table ht)))
+  (print (next iter))
+  (print (next iter))
+  (print (next iter))
+  (print (next iter))
+  (print (next iter))
+  (print (next iter)))
 
-;; List
-(loop :for n :in (list 1 2 3)
-      :do (print n))
+(defmacro comment (&body body)
+  (declare (ignore body))
+  (values))
 
-;; Want:
-(for ((n (list 1 2 3)))
-  (print n))
+(comment
+  ;; List
+  (loop :for n :in (list 1 2 3)
+        :do (print n))
 
-;; Vector
-(loop :for n :across (vector 1 2 3)
-      :do (print n))
+  ;; Want:
+  (for ((n (list 1 2 3)))
+       (print n))
 
-;; Want
-(for ((n (vector 1 2 3)))
-  (print n))
+  ;; Vector
+  (loop :for n :across (vector 1 2 3)
+        :do (print n))
 
-;; List (Destructuring)
-(loop :for (x y) :in (list '(1 2) '(3 4))
-      :do (print x) (print y))
+  ;; Want
+  (for ((n (vector 1 2 3)))
+       (print n))
 
-;; Want
-(for (((x y) (list '(1 2) '(3 4))))
-  (print x) (print y))
+  ;; List (Destructuring)
+  (loop :for (x y) :in (list '(1 2) '(3 4))
+        :do (print x) (print y))
 
-;; Vector (Destructuring)
-(loop :for (x y) :across (vector '(1 2) '(3 4))
-      :do (print x) (print y))
+  ;; Want
+  (for (((x y) (list '(1 2) '(3 4))))
+       (print x) (print y))
 
-;; Want
-(for (((x y) (vector '(1 2) '(3 4))))
-  (print x) (print y))
+  ;; Vector (Destructuring)
+  (loop :for (x y) :across (vector '(1 2) '(3 4))
+        :do (print x) (print y))
 
-;; Cons
-(loop :for (x . y) :in (list '(1 . 2) '(3 . 4))
-      :do (print x) (print y))
+  ;; Want
+  (for (((x y) (vector '(1 2) '(3 4))))
+       (print x) (print y))
 
-;; Want
-(for (((x . y) (list '(1 . 2) '(3 . 4))))
-  (print x) (print y))
+  ;; Cons
+  (loop :for (x . y) :in (list '(1 . 2) '(3 . 4))
+        :do (print x) (print y))
 
-;; Hash table
-(let ((h (make-hash-table :test 'equal)))
-  (setf (gethash "x" h) 10)
-  (setf (gethash "y" h) 20)
-  (loop :for k :being :the :hash-keys :of h :using (hash-value v)
-        :do (format t "~A -> ~A~%" k v)))
+  ;; Want
+  (for (((x . y) (list '(1 . 2) '(3 . 4))))
+       (print x) (print y))
 
-;; Want
-(let ((h (make-hash-table :test 'equal)))
-  (setf (gethash "x" h) 10)
-  (setf (gethash "y" h) 20)
-  (for (((k v) h))
-    (format t "~A -> ~A~%" k v)))
+  ;; Hash table
+  (let ((h (make-hash-table :test 'equal)))
+    (setf (gethash "x" h) 10)
+    (setf (gethash "y" h) 20)
+    (loop :for k :being :the :hash-keys :of h :using (hash-value v)
+          :do (format t "~A -> ~A~%" k v)))
+
+  ;; Want
+  (let ((h (make-hash-table :test 'equal)))
+    (setf (gethash "x" h) 10)
+    (setf (gethash "y" h) 20)
+    (for (((k v) h))
+         (format t "~A -> ~A~%" k v)))
+  )
