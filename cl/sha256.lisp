@@ -2,7 +2,7 @@
 (defpackage sha256 (:use :cl :sb-rotate-byte) (:export :sha256))
 (in-package sha256)
 
-;; Note 1: All variables are 32 bit unsigned integers and addition is calculated modulo 232
+;; Note 1: All variables are 32 bit unsigned integers and addition is calculated modulo 2^32
 ;; Note 2: For each round, there is one round constant k[i] and one entry in the message schedule array w[i], 0 ≤ i ≤ 63
 ;; Note 3: The compression function uses 8 working variables, a through h
 ;; Note 4: Big-endian convention is used when expressing the constants in this pseudocode,
@@ -38,26 +38,33 @@
       #x748f82ee #x78a5636f #x84c87814 #x8cc70208 #x90befffa #xa4506ceb #xbef9a3f7 #xc67178f2)))
 
 ;; Pre-processing (Padding):
-;; begin with the original message of length L bits
-;; append a single '1' bit
-;; append K '0' bits, where K is the minimum number >= 0 such that (L + 1 + K + 64) is a multiple of 512
-;; append L as a 64-bit big-endian integer, making the total post-processed length a multiple of 512 bits
-;; such that the bits in the message are: <original message of length L> 1 <K zeros> <L as 64 bit integer> , (the number of bits will be a multiple of 512)
-;; (declaim (ftype (function ((simple-array (unsigned-byte 8) (*))) (simple-array (unsigned-byte 8) (*))) pad))
-(declaim (ftype (function ((simple-array (unsigned-byte 8) (*))) (simple-array bit (*))) pad))
+(declaim (ftype (function ((simple-array (unsigned-byte 8) (*))) (simple-array (unsigned-byte 8) (*))) pad))
 (defun pad (msg)
   (let* ((L (* 8 (length msg)))
          (K (do ((k 0 (1+ k))) ((zerop (mod (+ L 1 k 64) 512)) k)))
          (padding (make-array (+ 1 K 64) :element-type 'bit :initial-element 0)))
-    ;; (declare (type (mod 512) K))
-    ;; (declare (dynamic-extent padding))
+    (declare (type (mod 512) K)) ;Is this a correct type?
+    (declare (dynamic-extent padding))
     (setf (aref padding 0) 1)
-    (do ((bit 63 (1- bit)))
-        ((zerop bit) padding)
-      (setf (aref padding (+ 1 K (abs (- bit 64)))) (ldb (byte 1 bit) L)))))
+    (do ((pos 63 (1- pos)))
+        ((zerop pos))
+      (setf (aref padding (+ 1 K (abs (- pos 64)))) (ldb (byte 1 pos) L)))
+    (assert (zerop (nth-value 1 (truncate (length padding) 8))))
+    (let ((bytes (make-array (truncate (length padding) 8) :element-type '(unsigned-byte 8))))
+      (dotimes (nbyte (length bytes))
+        (do ((pos 0 (1+ pos))
+             (b 0 (dpb (aref padding (+ pos (* nbyte 8))) (byte 1 (- 7 pos)) b)))
+            ((= 8 pos) (setf (aref bytes nbyte) b))))
+      bytes)))
 
-;; (time (loop for x below 10000
-;;   always (zerop (mod (length (pad (make-array x :element-type '(unsigned-byte 8) :initial-contents (loop repeat x collect (random 255))))) 8))))
+#+nil
+(progn
+  (ldb (byte 1 7) 128)
+
+  (time (pad (make-array 256 :element-type '(unsigned-byte 8) :initial-contents (loop repeat 256 collect (random 256)))))
+
+  (time (loop for x below 10000
+              always (zerop (mod (length (pad (make-array x :element-type '(unsigned-byte 8) :initial-contents (loop repeat x collect (random 255))))) 8)))))
 
 ;; Process the message in successive 512-bit chunks:
 ;; break message into 512-bit chunks
@@ -136,12 +143,15 @@
     ;; Produce the final hash value (big-endian):
     (vector h0 h1 h2 h3 h4 h5 h6 h7)))
 
+#+nil
+(progn
 (time (update (make-array 16
           :element-type '(unsigned-byte 32)
           :initial-contents
           (loop repeat 16 collect 0))))
 
 (disassemble 'update)
+)
 
 ;; 00000000 11111111 11111111 11111111 11111111 = #xFFFFFFFF
 ;; 00000000 10000000 00000000 00000000 00000000 = #x80000000
@@ -149,6 +159,8 @@
 ;; 00000001 01111111 11111111 11111111 11111111 = #x017FFFFFFF
 
 
+#+nil
+(progn
 (disassemble
  (lambda (x)
    (declare (type (unsigned-byte 32) x))
@@ -170,4 +182,4 @@
 ;; +          = 4546625550
 ;; (mod 4546625550 (expt 2 32))
 (dpb 0 (byte 1 32) (+ #xffffffff #x0f00000f))
-
+)
